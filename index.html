@@ -745,7 +745,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '3.11';
+const APP_VERSION = '3.12';
 let currentLoc = null;
 let setupLoc = null;
 
@@ -868,7 +868,8 @@ function showLogin(){
         <div class="Login">
           <div>
             <div class="Login-logo">Z<span class="secretA" style="cursor:pointer;">a</span>zz<span id="secretO" style="cursor:pointer;">o</span>'s</div>
-            <div class="Login-tag">Pick Location</div>
+            <div style="font-size:11px;font-weight:700;color:#999;text-align:center;letter-spacing:0.1em;margin-bottom:4px;">v${APP_VERSION}</div>
+          <div class="Login-tag">Pick Location</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px;">
             ${locs.map(l=>`
@@ -900,7 +901,6 @@ function showLogin(){
         <div class="Login-logo">Z<span class="secretA" style="cursor:pointer;">a</span>zz<span id="secretO" style="cursor:pointer;">o</span>'s</div>
         <div id="locTitle" style="font-family:'Libre Baskerville',Georgia,serif;font-size:22px;font-weight:700;color:#111;text-align:center;margin-top:4px;cursor:pointer;user-select:none;">${locLabel}</div>
         <div class="Login-tag">Inventory</div>
-        <div style="font-size:11px;font-weight:700;color:#999;text-align:center;letter-spacing:0.1em;margin-top:6px;">v${APP_VERSION}</div>
       </div>
       <div class="Login-grid" style="position:relative;">
         ${Object.entries(VENDORS).map(([vk,v])=>`
