@@ -745,7 +745,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '3.12';
+const APP_VERSION = '4.0';
 let currentLoc = null;
 let setupLoc = null;
 
@@ -1493,6 +1493,9 @@ function showCount(){
           </div>
         </div>
       </div>
+      <div style="padding:16px;">
+        <button class="B B-red B-lg" style="width:100%;" id="bOrderComplete">✓ Order Complete</button>
+      </div>
     </div>
     <div class="Footer no-print">
       <button class="Fbtn" id="bHome2">← Home</button>
@@ -1547,6 +1550,38 @@ function showCount(){
   document.querySelectorAll('[data-delAddon]').forEach(btn=>{
     btn.onclick=()=>{ addons[vk].splice(+btn.dataset.deladdon,1); saveState(); showCount(); };
   });
+
+  // Order Complete button
+  document.getElementById('bOrderComplete').onclick=()=>{
+    showModal('Additional Items?',
+      'Do you need to add any additional items before finishing this order?',
+      [
+        {l:'Yes, Add Items',c:'B-outline',fn:()=>{
+          closeModal();
+          setTimeout(()=>{ document.getElementById('addonName')?.scrollIntoView({block:'center',behavior:'smooth'}); document.getElementById('addonName')?.focus(); },100);
+        }},
+        {l:'No, Finish',c:'B-red',fn:()=>{
+          closeModal();
+          try{
+            const logKey='zaz_store_log_'+currentLoc;
+            const log=JSON.parse(localStorage.getItem(logKey)||'[]');
+            log.push({
+              vendor:VENDORS[vk].name,
+              store:currentLoc,
+              user:sessionUser||currentUser||'',
+              orderDate:currentDate||'',
+              deliveryDate:deliveryDate||'',
+              itemsOrdered:totalCounted(vk),
+              addonCount:(addons[vk]||[]).length,
+              completedAt:new Date().toISOString()
+            });
+            localStorage.setItem(logKey, JSON.stringify(log));
+          }catch(e){}
+          showLogin();
+        }}
+      ]
+    );
+  };
 
   // Accordion toggle
   document.querySelectorAll('.LocHeader.unlocked').forEach(hdr=>{
