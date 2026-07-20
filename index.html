@@ -745,7 +745,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '4.0';
+const APP_VERSION = '4.1';
 let currentLoc = null;
 let setupLoc = null;
 
@@ -769,10 +769,11 @@ let deliveryDate = '';
 let sessionUser = currentUser;
 let freeNav = false;
 let sess = {};
+let completed = {}; // completed[vk] = ISO date string of completion, cleared at 8pm rollover
 
 function STATE_KEY(){ return 'zaz_state_'+currentLoc; }
 function saveState(){
-  try{ localStorage.setItem(STATE_KEY(), JSON.stringify({counts, addons, sess})); }catch(e){}
+  try{ localStorage.setItem(STATE_KEY(), JSON.stringify({counts, addons, sess, completed})); }catch(e){}
 }
 function loadState(){
   try{
@@ -781,15 +782,41 @@ function loadState(){
     if(s.counts) Object.keys(s.counts).forEach(k=>{ counts[k]=s.counts[k]||{}; });
     if(s.addons) Object.keys(s.addons).forEach(k=>{ addons[k]=s.addons[k]||[]; });
     if(s.sess) Object.assign(sess, s.sess);
+    if(s.completed) Object.assign(completed, s.completed);
+    applyDailyRollover();
   }catch(e){}
 }
 
 function saveUser(name){ currentUser=name; localStorage.setItem('zaz_user',name); }
+function applyDailyRollover(){
+  try{
+    const now = new Date();
+    const rolloverKey = 'zaz_last_rollover_'+currentLoc;
+    const lastRollover = localStorage.getItem(rolloverKey);
+    const todayRolloverPoint = new Date(now);
+    todayRolloverPoint.setHours(20,0,0,0); // 8:00 PM
+    // The rollover "date" is the date of the most recent 8pm threshold that has passed
+    const thresholdDate = (now >= todayRolloverPoint) ? now.toDateString() : new Date(now.getTime()-86400000).toDateString();
+    if(lastRollover !== thresholdDate){
+      Object.keys(VENDORS).forEach(vk=>{
+        if(completed[vk]){
+          counts[vk]={};
+          addons[vk]=[];
+          completed[vk]=null;
+          openLocs[vk]=null;
+        }
+      });
+      localStorage.setItem(rolloverKey, thresholdDate);
+      saveState();
+    }
+  }catch(e){}
+}
+
 function initLocation(loc){
   currentLoc = loc;
   VENDORS = DATA[loc];
   counts = {}; openLocs = {}; addons = {}; sess = {};
-  Object.keys(VENDORS).forEach(vk => { counts[vk]={}; openLocs[vk]=null; addons[vk]=[]; });
+  Object.keys(VENDORS).forEach(vk => { counts[vk]={}; openLocs[vk]=null; addons[vk]=[]; completed[vk]=null; });
   loadState();
 }
 
@@ -1058,6 +1085,48 @@ function usToISO(us){
   const p = us.split('/');
   if(p.length!==3) return null;
   return `${p[2]}-${p[0]}-${p[1]}`;
+}
+
+async function pushOrderToSupabase(vk){
+  try{
+    const batch = currentLoc+'|'+VENDORS[vk].name+'|'+(currentDate||'');
+    // Remove old rows for this batch, then insert the current full set —
+    // this represents "the order as it stands now" without touching other batches.
+    await supa('inventory_orders?batch_id=eq.'+encodeURIComponent(batch), {method:'DELETE'});
+    const rows=[];
+    VENDORS[vk].items.forEach(item=>{
+      const or=getC(vk,item,'order');
+      if(or!=='' && or!=='0'){
+        rows.push({
+          batch_id: batch,
+          store: currentLoc,
+          vendor: VENDORS[vk].name,
+          item: item.item,
+          item_num: item.num,
+          qty: parseFloat(or)||0,
+          on_hand: parseFloat(getC(vk,item,'oh'))||0,
+          counted_by: sessionUser||'',
+          order_date: usToISO(currentDate),
+          delivery_date: usToISO(deliveryDate)
+        });
+      }
+    });
+    (addons[vk]||[]).forEach(a=>{
+      rows.push({
+        batch_id: batch,
+        store: currentLoc,
+        vendor: VENDORS[vk].name,
+        item: '[ADD-ON] '+a.name,
+        item_num: '',
+        qty: parseFloat(a.qty)||0,
+        on_hand: null,
+        counted_by: sessionUser||'',
+        order_date: usToISO(currentDate),
+        delivery_date: usToISO(deliveryDate)
+      });
+    });
+    if(rows.length) await supa('inventory_orders', {method:'POST', body:JSON.stringify(rows)});
+  }catch(e){ console.error('order push failed', e); }
 }
 
 async function logOrderToCloud(vk, mode){
@@ -1526,7 +1595,7 @@ function showCount(){
   document.getElementById('bClear').onclick=()=>{
     showModal('Clear All Counts','This will erase all entries for '+v.name+'. Are you sure?',[
       {l:'Cancel',c:'B-outline',fn:closeModal},
-      {l:'Clear',c:'B-red',fn:()=>{ closeModal(); counts[vk]={}; addons[vk]=[]; delete sess[vk]; openLocs[vk]=getLocs(vk)[0]; saveState(); showLogin(); }}
+      {l:'Clear',c:'B-red',fn:()=>{ closeModal(); counts[vk]={}; addons[vk]=[]; delete sess[vk]; completed[vk]=null; openLocs[vk]=getLocs(vk)[0]; saveState(); showLogin(); }}
     ]);
   };
 
@@ -1560,8 +1629,10 @@ function showCount(){
           closeModal();
           setTimeout(()=>{ document.getElementById('addonName')?.scrollIntoView({block:'center',behavior:'smooth'}); document.getElementById('addonName')?.focus(); },100);
         }},
-        {l:'No, Finish',c:'B-red',fn:()=>{
+        {l:'No, Finish',c:'B-red',fn:async ()=>{
           closeModal();
+          completed[vk] = new Date().toISOString();
+          saveState();
           try{
             const logKey='zaz_store_log_'+currentLoc;
             const log=JSON.parse(localStorage.getItem(logKey)||'[]');
@@ -1573,10 +1644,11 @@ function showCount(){
               deliveryDate:deliveryDate||'',
               itemsOrdered:totalCounted(vk),
               addonCount:(addons[vk]||[]).length,
-              completedAt:new Date().toISOString()
+              completedAt:completed[vk]
             });
             localStorage.setItem(logKey, JSON.stringify(log));
           }catch(e){}
+          await pushOrderToSupabase(vk);
           showLogin();
         }}
       ]
@@ -1636,6 +1708,22 @@ function showCount(){
     input.oninput=()=>{
       const {vk:v2,loc,idx,f}=input.dataset;
       const item=getLocItems(v2,loc)[+idx];
+
+      // If this vendor was already completed, this is a CORRECTION — log it and re-lock printing
+      if(f==='order' && completed[v2]){
+        const prevVal = getC(v2,item,'order');
+        if(prevVal !== input.value){
+          try{
+            const corrKey='zaz_corrections_'+v2;
+            const corr=JSON.parse(sessionStorage.getItem(corrKey)||'[]');
+            corr.push({item:item.item, from:prevVal||'0', to:input.value||'0', at:new Date().toISOString()});
+            sessionStorage.setItem(corrKey, JSON.stringify(corr));
+          }catch(e){}
+          completed[v2]=null; // must hit Complete again before printing
+          saveState();
+        }
+      }
+
       setC(v2,item,f,input.value);
       input.classList.toggle('filled',input.value!=='');
       refreshBadge(v2,loc);
@@ -1731,6 +1819,13 @@ function closeModal(){ document.getElementById('modal')?.remove(); }
 
 // ─── PRINT ───────────────────────────────────────────────────────────────────
 function showPrintChoice(vk){
+  if(!completed[vk]){
+    showModal('🚫 Printing Locked',
+      'This order has not been marked Complete. Press ✓ Order Complete before printing.',
+      [{l:'OK',c:'B-red',fn:closeModal}]
+    );
+    return;
+  }
   showModal('Print Order',
     'Choose what to print for '+VENDORS[vk].name+'.',
     [
@@ -1880,6 +1975,33 @@ function doPrint(vk, mode){
       </table>
     </div>` : '';
 
+  // Corrections log — items edited after this order was already completed
+  let corrRows='';
+  if(mode!=='blank'){
+    try{
+      const corr=JSON.parse(sessionStorage.getItem('zaz_corrections_'+vk)||'[]');
+      corr.forEach(c=>{
+        corrRows+=`<tr>
+          <td style="padding:3px 8px;border:1px solid #F0D080;font-size:9px;">${c.item}</td>
+          <td style="padding:3px 8px;border:1px solid #F0D080;font-size:9px;text-align:center;">${c.from}</td>
+          <td style="padding:3px 8px;border:1px solid #F0D080;font-size:9px;text-align:center;font-weight:700;">${c.to}</td>
+        </tr>`;
+      });
+    }catch(e){}
+  }
+  const corrHTML = corrRows ? `
+    <div style="margin-top:14px;page-break-inside:avoid;">
+      <div style="background:#8A6D00;color:#fff;font-weight:700;padding:5px 8px;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;border:2px solid #6B5400;">✎ ORDER CORRECTIONS — CHANGED AFTER COMPLETE</div>
+      <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+        <tr>
+          <td style="background:#FFF3CD;font-weight:700;padding:3px 8px;font-size:8px;text-transform:uppercase;width:50%;border:1px solid #F0D080;">Item</td>
+          <td style="background:#FFF3CD;font-weight:700;padding:3px 8px;font-size:8px;text-transform:uppercase;width:25%;text-align:center;border:1px solid #F0D080;">Original</td>
+          <td style="background:#FFF3CD;font-weight:700;padding:3px 8px;font-size:8px;text-transform:uppercase;width:25%;text-align:center;border:1px solid #F0D080;">Corrected</td>
+        </tr>
+        ${corrRows}
+      </table>
+    </div>` : '';
+
   const subtitle = mode==='blank' ? 'BLANK SHEET' : mode==='orderonly' ? 'ORDER ONLY' : 'FULL SHEET';
 
   document.getElementById('print-area').innerHTML=`
@@ -1897,7 +2019,9 @@ function doPrint(vk, mode){
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed;"><tbody>${tableRows}</tbody></table>
       ${alertHTML}
+      ${corrHTML}
     </div>`;
+  if(mode!=='blank'){ try{ sessionStorage.removeItem('zaz_corrections_'+vk); }catch(e){} }
   logOrderToCloud(vk, mode);
   window.print();
 }
