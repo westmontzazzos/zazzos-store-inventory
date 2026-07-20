@@ -482,8 +482,8 @@ const DATA = {
     {loc:"WIC",item:"Chicken Hearts 6oz",num:"204376",par:"10"},
     {loc:"WIC",item:"Spear Pickles",num:"39073",par:"1"},
     {loc:"WIC",item:"Garlic Spread",num:"39190",par:"4"},
-    {loc:"WIC",item:"Sliced Cheese Aged",num:"18330",par:"1"},
-    {loc:"WIC",item:"Pizza Cheese 12 Days",num:"18310",par:"10"},
+    {loc:"Prep Fzr & Shelf",item:"Sliced Cheese Aged",num:"18330",par:"1"},
+    {loc:"Prep Fzr & Shelf",item:"Pizza Cheese 12 Days",num:"18310",par:"10"},
     {loc:"WIC",item:"Grated Parm",num:"194873",par:"2"},
     {loc:"WIC",item:"Shaved Parm",num:"19462wsp",par:"2"},
     {loc:"WIC",item:"Margarine",num:"10576",par:"0.5"},
@@ -745,7 +745,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '4.1';
+const APP_VERSION = '4.2';
 let currentLoc = null;
 let setupLoc = null;
 
@@ -770,6 +770,7 @@ let sessionUser = currentUser;
 let freeNav = false;
 let sess = {};
 let completed = {}; // completed[vk] = ISO date string of completion, cleared at 8pm rollover
+let reviewMode = false; // true = view-only, no edits allowed
 
 function STATE_KEY(){ return 'zaz_state_'+currentLoc; }
 function saveState(){
@@ -823,14 +824,14 @@ function initLocation(loc){
 function ikey(item){ return item.loc+'|'+item.item; }
 function getC(vk,item,f){ return (counts[vk][ikey(item)]||{})[f]||''; }
 function setC(vk,item,f,v){ if(!counts[vk][ikey(item)]) counts[vk][ikey(item)]={}; counts[vk][ikey(item)][f]=v; saveState(); }
-function getLocs(vk){ return [...new Set(VENDORS[vk].items.map(i=>i.loc))]; }
+function getLocs(vk){ return [...new Set(VENDORS[vk].items.map(i=>i.loc))].filter(l=>l!=='School Supplies'); }
 function getLocItems(vk,loc){ return VENDORS[vk].items.filter(i=>i.loc===loc); }
 function locFilledCount(vk,loc){ return getLocItems(vk,loc).filter(i=>getC(vk,i,'oh')!=='' && getC(vk,i,'order')!=='').length; }
 function locComplete(vk,loc){ const items=getLocItems(vk,loc); return items.length>0 && items.every(i=>getC(vk,i,'oh')!=='' && getC(vk,i,'order')!==''); }
 function prevComplete(vk,li){ return freeNav || li===0 || locComplete(vk,getLocs(vk)[li-1]); }
 function allComplete(vk){ return getLocs(vk).every(loc=>locComplete(vk,loc)); }
-function totalItems(vk){ return VENDORS[vk].items.length; }
-function totalCounted(vk){ return VENDORS[vk].items.filter(i=>getC(vk,i,'oh')!=='' && getC(vk,i,'order')!=='').length; }
+function totalItems(vk){ return VENDORS[vk].items.filter(i=>i.loc!=='School Supplies').length; }
+function totalCounted(vk){ return VENDORS[vk].items.filter(i=>i.loc!=='School Supplies' && getC(vk,i,'oh')!=='' && getC(vk,i,'order')!=='').length; }
 
 const app = document.getElementById('app');
 
@@ -844,7 +845,7 @@ function showLogin(){
       app.innerHTML=`
         <div class="Login">
           <div>
-            <div class="Login-logo">Z<span class="secretA" style="cursor:pointer;">a</span>zz<span id="secretO" style="cursor:pointer;">o</span>'s</div>
+            <div class="Login-logo">Z<span class="secretA" style="cursor:pointer;">a</span>zz<span id="secretO" style="cursor:pointer;">o</span>'<span class="secretS" style="cursor:pointer;">s</span></div>
             <div class="Login-tag">Pick Your Location</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px;">
@@ -866,7 +867,7 @@ function showLogin(){
     app.innerHTML=`
       <div class="Login">
         <div>
-          <div class="Login-logo">Z<span class="secretA" style="cursor:pointer;">a</span>zz<span id="secretO" style="cursor:pointer;">o</span>'s</div>
+          <div class="Login-logo">Z<span class="secretA" style="cursor:pointer;">a</span>zz<span id="secretO" style="cursor:pointer;">o</span>'<span class="secretS" style="cursor:pointer;">s</span></div>
           <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:22px;font-weight:700;color:#111;text-align:center;margin-top:4px;">${setupLoc.charAt(0).toUpperCase()+setupLoc.slice(1)}</div>
           <div class="Login-tag">Who are you?</div>
         </div>
@@ -894,7 +895,7 @@ function showLogin(){
       app.innerHTML=`
         <div class="Login">
           <div>
-            <div class="Login-logo">Z<span class="secretA" style="cursor:pointer;">a</span>zz<span id="secretO" style="cursor:pointer;">o</span>'s</div>
+            <div class="Login-logo">Z<span class="secretA" style="cursor:pointer;">a</span>zz<span id="secretO" style="cursor:pointer;">o</span>'<span class="secretS" style="cursor:pointer;">s</span></div>
             <div style="font-size:11px;font-weight:700;color:#999;text-align:center;letter-spacing:0.1em;margin-bottom:4px;">v${APP_VERSION}</div>
           <div class="Login-tag">Pick Location</div>
           </div>
@@ -925,7 +926,7 @@ function showLogin(){
   app.innerHTML=`
     <div class="Login">
       <div>
-        <div class="Login-logo">Z<span class="secretA" style="cursor:pointer;">a</span>zz<span id="secretO" style="cursor:pointer;">o</span>'s</div>
+        <div class="Login-logo">Z<span class="secretA" style="cursor:pointer;">a</span>zz<span id="secretO" style="cursor:pointer;">o</span>'<span class="secretS" style="cursor:pointer;">s</span></div>
         <div id="locTitle" style="font-family:'Libre Baskerville',Georgia,serif;font-size:22px;font-weight:700;color:#111;text-align:center;margin-top:4px;cursor:pointer;user-select:none;">${locLabel}</div>
         <div class="Login-tag">Inventory</div>
       </div>
@@ -970,11 +971,25 @@ function showLogin(){
       activeVendor=el.dataset.vk;
       if(!openLocs[activeVendor]) openLocs[activeVendor]=getLocs(activeVendor)[0];
       const s = sess[activeVendor];
-      if(s){
-        sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
-        showCount();
+      const goIn=()=>{
+        if(s){
+          sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
+          showCount();
+        } else {
+          showVerify(activeVendor);
+        }
+      };
+      if(completed[activeVendor]){
+        showModal('Order Already Completed',
+          'This order was marked complete. What would you like to do?',
+          [
+            {l:'Review Order',c:'B-outline',fn:()=>{ closeModal(); reviewMode=true; goIn(); }},
+            {l:'Edit Order',c:'B-red',fn:()=>{ closeModal(); reviewMode=false; goIn(); }}
+          ]
+        );
       } else {
-        showVerify(activeVendor);
+        reviewMode=false;
+        goIn();
       }
     };
   });
@@ -1085,6 +1100,71 @@ function usToISO(us){
   const p = us.split('/');
   if(p.length!==3) return null;
   return `${p[2]}-${p[0]}-${p[1]}`;
+}
+
+async function finishOrderComplete(vk){
+  completed[vk] = new Date().toISOString();
+  saveState();
+  try{
+    const logKey='zaz_store_log_'+currentLoc;
+    const log=JSON.parse(localStorage.getItem(logKey)||'[]');
+    log.push({
+      vendor:VENDORS[vk].name,
+      store:currentLoc,
+      user:sessionUser||currentUser||'',
+      orderDate:currentDate||'',
+      deliveryDate:deliveryDate||'',
+      itemsOrdered:totalCounted(vk),
+      addonCount:(addons[vk]||[]).length,
+      completedAt:completed[vk]
+    });
+    localStorage.setItem(logKey, JSON.stringify(log));
+  }catch(e){}
+  await pushOrderToSupabase(vk);
+  showLogin();
+}
+
+function showSchoolSuppliesEntry(vk){
+  const items = VENDORS[vk].items.filter(i=>i.loc==='School Supplies');
+  app.innerHTML=`
+    <header class="H no-print">
+      <div class="H-logo">School Supplies</div>
+      <div class="H-right"></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div class="LocBlock">
+        <div class="ItemList" data-loc="School Supplies">
+          ${items.map((item,idx)=>{
+            const oh=getC(vk,item,'oh'), or=getC(vk,item,'order');
+            return `<div class="ProdRow">
+              <div class="ProdRow-info">
+                <div class="ProdRow-name">${item.item}</div>
+              </div>
+              <div class="DualInput">
+                <div class="IG"><label>On Hand</label>
+                  <input class="SI" type="number" min="0" step="0.1" inputmode="decimal" data-ssidx="${idx}" data-ssf="oh" value="${oh}" placeholder="0">
+                </div>
+                <div class="IG"><label>Order</label>
+                  <input class="SI" type="number" min="0" step="0.1" inputmode="decimal" data-ssidx="${idx}" data-ssf="order" value="${or}" placeholder="0">
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>
+      <div style="padding:16px;">
+        <button class="B B-red B-lg" style="width:100%;" id="bSchoolSuppliesDone">✓ Done — Finish Order</button>
+      </div>
+    </div>`;
+
+  document.querySelectorAll('[data-ssidx]').forEach(input=>{
+    input.oninput=()=>{
+      const idx=+input.dataset.ssidx, f=input.dataset.ssf;
+      setC(vk, items[idx], f, input.value);
+    };
+  });
+
+  document.getElementById('bSchoolSuppliesDone').onclick=()=>finishOrderComplete(vk);
 }
 
 async function pushOrderToSupabase(vk){
@@ -1344,6 +1424,141 @@ function showShortcuts(){
   );
 }
 
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+let dashWeekOffset = 0; // 0 = this week, +1 = next week, -1 = last week
+
+function getWeekDates(offset){
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun..6=Sat
+  const mondayOffset = (day===0) ? -6 : 1-day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate()+mondayOffset+(offset*7));
+  monday.setHours(0,0,0,0);
+  const week=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(monday);
+    d.setDate(monday.getDate()+i);
+    week.push(d);
+  }
+  return week; // [Mon..Sun]
+}
+
+// Vendors scheduled to be ordered on a given weekday (0=Mon..6=Sun) for a given store
+function scheduledVendors(dow, store){
+  const list=[];
+  if(dow<=5) list.push('Bread');       // Mon-Sat
+  if(dow<=5) list.push('Greco');       // Mon-Sat
+  if(dow===6 || dow===2) list.push('GFS');     // Sun & Wed
+  if(dow===1 || dow===4) list.push('Marlin');  // Tue & Fri (if needed)
+  const cokeDueDow = store==='westmont' ? 1 : 2; // Westmont Tue, Darien Wed
+  if(dow===cokeDueDow) list.push('Coke');
+  return list.sort();
+}
+
+function wasCompletedOn(vendorName, dateObj, store){
+  const iso = dateObj.toISOString().slice(0,10);
+  try{
+    const log = JSON.parse(localStorage.getItem('zaz_store_log_'+store)||'[]');
+    return log.some(e=>e.vendor===vendorName && e.orderDate && usToISO(e.orderDate)===iso);
+  }catch(e){ return false; }
+}
+
+function findCompletedEntry(vendorName, dateObj, store){
+  const iso = dateObj.toISOString().slice(0,10);
+  try{
+    const log = JSON.parse(localStorage.getItem('zaz_store_log_'+store)||'[]');
+    return log.find(e=>e.vendor===vendorName && e.orderDate && usToISO(e.orderDate)===iso) || null;
+  }catch(e){ return null; }
+}
+
+function showDashboard(){
+  showModal('📱 Rotate Your Phone',
+    'This dashboard is easiest to read in landscape mode. Rotate your phone sideways, then tap Continue.',
+    [{l:'Continue →',c:'B-red',fn:()=>{ closeModal(); renderDashboard(); }}]
+  );
+}
+
+function renderDashboard(){
+  const week = getWeekDates(dashWeekOffset);
+  const dayNames=['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  const vendorOrder=['Bread','Coke','GFS','Greco','Marlin'];
+  const now=new Date();
+
+  // Build cell status per vendor/day
+  const cellHTML = vendorOrder.map(vendor=>{
+    const rowCells = week.map((d,dow)=>{
+      const scheduled = scheduledVendors(dow, currentLoc).includes(vendor);
+      if(!scheduled) return '<td style="background:#F5F5F5;border:1px solid #DDD;"></td>';
+      const done = wasCompletedOn(vendor, d, currentLoc);
+      const isFuture = d > now && d.toDateString()!==now.toDateString();
+      if(done){
+        return `<td style="background:#E6F4EA;border:1px solid #DDD;text-align:center;cursor:pointer;" data-dashcell="${vendor}|${d.toISOString().slice(0,10)}"><span style="color:#1B6B3A;font-size:22px;font-weight:700;">✓</span></td>`;
+      } else if(isFuture){
+        return '<td style="background:#fff;border:1px solid #DDD;text-align:center;color:#BBB;font-size:12px;">—</td>';
+      } else {
+        return `<td style="background:#FDECEA;border:1px solid #DDD;text-align:center;"><span style="color:#C8102E;font-size:22px;font-weight:700;">✕</span></td>`;
+      }
+    }).join('');
+    return `<tr><td style="background:#1A1A2E;color:#fff;font-weight:700;padding:8px 10px;font-size:13px;">${vendor}</td>${rowCells}</tr>`;
+  }).join('');
+
+  const headerCells = week.map((d,i)=>`<td style="background:#C8102E;color:#fff;font-weight:700;text-align:center;padding:8px 4px;font-size:12px;">${dayNames[i]}<br><span style="font-weight:400;font-size:10px;">${d.getMonth()+1}/${d.getDate()}</span></td>`).join('');
+
+  app.innerHTML=`
+    <header class="H no-print">
+      <div class="H-logo">Order Dashboard</div>
+      <div class="H-right"><button class="B B-ghost" id="bDashHome">← Home</button></div>
+    </header>
+    <div style="margin-top:76px;padding:16px;overflow-x:auto;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <button class="B B-outline" id="bDashPrev">← Prev Week</button>
+        <div style="font-weight:700;font-family:'Libre Baskerville',Georgia,serif;">${currentLoc.charAt(0).toUpperCase()+currentLoc.slice(1)} — ${dashWeekOffset===0?'This Week':dashWeekOffset>0?dashWeekOffset+' week(s) ahead':Math.abs(dashWeekOffset)+' week(s) ago'}</div>
+        <button class="B B-outline" id="bDashNext">Next Week →</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;min-width:600px;">
+        <tr><td style="background:#1A1A2E;"></td>${headerCells}</tr>
+        ${cellHTML}
+      </table>
+      <div style="font-size:11px;color:#999;text-align:center;margin-top:14px;">✓ = order completed &nbsp;·&nbsp; ✕ = not completed &nbsp;·&nbsp; — = not yet due &nbsp;·&nbsp; blank = not scheduled that day</div>
+    </div>`;
+
+  document.getElementById('bDashHome').onclick=()=>showLogin();
+  document.getElementById('bDashPrev').onclick=()=>{ dashWeekOffset--; renderDashboard(); };
+  document.getElementById('bDashNext').onclick=()=>{ dashWeekOffset++; renderDashboard(); };
+
+  document.querySelectorAll('[data-dashcell]').forEach(td=>{
+    td.onclick=()=>{
+      const [vendorName, iso] = td.dataset.dashcell.split('|');
+      const dateObj=new Date(iso+'T00:00:00');
+      const entry=findCompletedEntry(vendorName, dateObj, currentLoc);
+      showDashOrderView(vendorName, entry);
+    };
+  });
+}
+
+function showDashOrderView(vendorName, entry){
+  const vk = Object.keys(VENDORS).find(k=>VENDORS[k].name===vendorName);
+  if(!vk || !entry){
+    showModal('Not Found','Could not locate this order.',[{l:'OK',c:'B-red',fn:()=>{ closeModal(); renderDashboard(); }}]);
+    return;
+  }
+  // Pull the actual saved order for this date from local counts if it's still the active session,
+  // otherwise show the store-log summary (Supabase holds full detail; this is the quick local view).
+  showModal('Order Summary — '+vendorName,
+    `<div style="text-align:left;line-height:1.9;font-size:13px;">
+      <strong>Store:</strong> ${entry.store}<br>
+      <strong>Vendor:</strong> ${entry.vendor}<br>
+      <strong>Order Date:</strong> ${entry.orderDate||'—'}<br>
+      <strong>Delivery Date:</strong> ${entry.deliveryDate||'—'}<br>
+      <strong>Counted By:</strong> ${entry.user||'—'}<br>
+      <strong>Items Ordered:</strong> ${entry.itemsOrdered}<br>
+      <strong>Add-Ons:</strong> ${entry.addonCount}<br>
+      <strong>Completed At:</strong> ${entry.completedAt ? new Date(entry.completedAt).toLocaleString() : '—'}
+    </div>`,
+    [{l:'← Back to Dashboard',c:'B-red',fn:()=>{ closeModal(); renderDashboard(); }}]
+  );
+}
+
 function showAddonLog(){
   let log=[];
   try{ log=JSON.parse(localStorage.getItem('zaz_addon_log_'+currentLoc)||'[]'); }catch(e){}
@@ -1402,7 +1617,7 @@ function showWhoIsThis(vk){
   app.innerHTML=`
     <div class="Login">
       <div>
-        <div class="Login-logo">Z<span class="secretA" style="cursor:pointer;">a</span>zz<span id="secretO" style="cursor:pointer;">o</span>'s</div>
+        <div class="Login-logo">Z<span class="secretA" style="cursor:pointer;">a</span>zz<span id="secretO" style="cursor:pointer;">o</span>'<span class="secretS" style="cursor:pointer;">s</span></div>
         <div class="Login-tag">Who is this?</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:320px;">
@@ -1499,15 +1714,16 @@ function showCount(){
         </div>
         <div class="DualInput">
           <div class="IG"><label>On Hand</label>
-            <input class="SI${oh?' filled':''}" type="number" min="0" inputmode="numeric"
+            <input class="SI${oh?' filled':''}" type="number" min="0" step="0.1" inputmode="decimal"
               data-vk="${vk}" data-loc="${loc}" data-idx="${idx}" data-f="oh" value="${oh}" placeholder="0"
-              ${(SEQ()&&!prevDone)?'disabled style="opacity:0.35;background:#F5F5F5;"':''}>
+              ${(reviewMode||(SEQ()&&!prevDone))?'disabled style="opacity:0.35;background:#F5F5F5;"':''}>
           </div>
           <div class="IG"><label>Order</label>
-            <input class="SI${or?' filled':''}" type="number" min="0" inputmode="numeric"
+            <input class="SI${or?' filled':''}" type="number" min="0" step="0.1" inputmode="decimal"
               data-vk="${vk}" data-loc="${loc}" data-idx="${idx}" data-f="order" value="${or}" placeholder="0"
-              ${(SEQ()&&(!prevDone||oh===''))?'disabled style="opacity:0.35;background:#F5F5F5;"':''}>
+              ${(reviewMode||(SEQ()&&(!prevDone||oh==='')))?'disabled style="opacity:0.35;background:#F5F5F5;"':''}>
           </div>
+          ${reviewMode?'':`<button type="button" class="NextRowBtn" data-nextfor="${vk}|${loc}|${idx}" title="Go to next field" style="flex-shrink:0;width:44px;height:44px;border:none;border-radius:8px;background:#1B6B3A;color:#fff;font-size:20px;font-weight:700;align-self:flex-end;margin-bottom:2px;">↓</button>`}
         </div>
       </div>`;
     }).join('');
@@ -1518,7 +1734,7 @@ function showCount(){
          </div>
          <div class="ItemList" data-loc="${loc}">${rowsHTML}</div>
          <div class="NoResults" style="display:none;" data-noresults="${loc}">No items match your search.</div>
-         ${!complete ? `<div style="padding:12px 16px;border-top:1px solid #F0F0F0;"><button class="B B-outline" style="width:100%;" data-markdone="${loc}">✓ Mark Location Complete</button></div>` : ''}`
+         ${(!complete && !reviewMode) ? `<div style="padding:12px 16px;border-top:1px solid #F0F0F0;"><button class="B B-outline" style="width:100%;" data-markdone="${loc}">✓ Mark Location Complete</button></div>` : ''}`
       : `<div class="LocLocked" style="padding:14px 16px;font-size:13px;color:#999;text-align:center;font-style:italic;">Complete the previous location to unlock.</div>`;
 
     return `<div class="LocBlock" id="lb-${li}">
@@ -1543,6 +1759,7 @@ function showCount(){
       </div>
     </header>
     <div class="Page">${blocks}
+      ${reviewMode ? `<div style="background:#1A1A2E;color:#fff;text-align:center;padding:12px 16px;font-weight:700;font-size:13px;letter-spacing:0.05em;">👁 REVIEW MODE — No changes can be made</div>` : `
       <div class="LocBlock" style="border:2px dashed #C8102E;">
         <div style="padding:13px 16px;">
           <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:15px;font-weight:700;color:#C8102E;margin-bottom:4px;">➕ Add-Ons</div>
@@ -1564,7 +1781,7 @@ function showCount(){
       </div>
       <div style="padding:16px;">
         <button class="B B-red B-lg" style="width:100%;" id="bOrderComplete">✓ Order Complete</button>
-      </div>
+      </div>`}
     </div>
     <div class="Footer no-print">
       <button class="Fbtn" id="bHome2">← Home</button>
@@ -1600,7 +1817,7 @@ function showCount(){
   };
 
   // Add-on bindings
-  document.getElementById('bAddAddon').onclick=()=>{
+  document.getElementById('bAddAddon')?.addEventListener('click', ()=>{
     const name=document.getElementById('addonName').value.trim();
     const qty=document.getElementById('addonQty').value.trim();
     if(!name){ document.getElementById('addonName').style.borderColor='#C8102E'; return; }
@@ -1615,13 +1832,13 @@ function showCount(){
     }catch(e){}
     showCount();
     setTimeout(()=>{ window.scrollTo(0,document.body.scrollHeight); },50);
-  };
+  });
   document.querySelectorAll('[data-delAddon]').forEach(btn=>{
     btn.onclick=()=>{ addons[vk].splice(+btn.dataset.deladdon,1); saveState(); showCount(); };
   });
 
   // Order Complete button
-  document.getElementById('bOrderComplete').onclick=()=>{
+  document.getElementById('bOrderComplete')?.addEventListener('click', ()=>{
     showModal('Additional Items?',
       'Do you need to add any additional items before finishing this order?',
       [
@@ -1629,31 +1846,24 @@ function showCount(){
           closeModal();
           setTimeout(()=>{ document.getElementById('addonName')?.scrollIntoView({block:'center',behavior:'smooth'}); document.getElementById('addonName')?.focus(); },100);
         }},
-        {l:'No, Finish',c:'B-red',fn:async ()=>{
+        {l:'No, Finish',c:'B-red',fn:()=>{
           closeModal();
-          completed[vk] = new Date().toISOString();
-          saveState();
-          try{
-            const logKey='zaz_store_log_'+currentLoc;
-            const log=JSON.parse(localStorage.getItem(logKey)||'[]');
-            log.push({
-              vendor:VENDORS[vk].name,
-              store:currentLoc,
-              user:sessionUser||currentUser||'',
-              orderDate:currentDate||'',
-              deliveryDate:deliveryDate||'',
-              itemsOrdered:totalCounted(vk),
-              addonCount:(addons[vk]||[]).length,
-              completedAt:completed[vk]
-            });
-            localStorage.setItem(logKey, JSON.stringify(log));
-          }catch(e){}
-          await pushOrderToSupabase(vk);
-          showLogin();
+          const hasSchoolSupplies = VENDORS[vk].items.some(i=>i.loc==='School Supplies');
+          if(hasSchoolSupplies){
+            showModal('School Supplies?',
+              'Do you need to order school supplies?',
+              [
+                {l:'No',c:'B-outline',fn:()=>{ closeModal(); finishOrderComplete(vk); }},
+                {l:'Yes',c:'B-red',fn:()=>{ closeModal(); showSchoolSuppliesEntry(vk); }}
+              ]
+            );
+          } else {
+            finishOrderComplete(vk);
+          }
         }}
       ]
     );
-  };
+  });
 
   // Accordion toggle
   document.querySelectorAll('.LocHeader.unlocked').forEach(hdr=>{
@@ -1706,6 +1916,7 @@ function showCount(){
   const allInputs=[...document.querySelectorAll('.SI')];
   allInputs.forEach((input,i)=>{
     input.oninput=()=>{
+      if(reviewMode) return;
       const {vk:v2,loc,idx,f}=input.dataset;
       const item=getLocItems(v2,loc)[+idx];
 
@@ -1732,22 +1943,7 @@ function showCount(){
       // Refresh sequential locks for this location
       refreshItemLocks(v2, loc, allInputs);
 
-      // auto-advance after you STOP typing (so multi-digit numbers work)
-      clearTimeout(input._advT);
-      if(input.value!==''){
-        input._advT=setTimeout(()=>{
-          if(document.activeElement!==input) return; // user already moved
-          const idx=allInputs.indexOf(input);
-          for(let j=idx+1;j<allInputs.length;j++){
-            if(!allInputs[j].disabled){
-              allInputs[j].focus();
-              allInputs[j].scrollIntoView({block:'center',behavior:'smooth'});
-              return;
-            }
-          }
-          input.blur();
-        },900);
-      }
+      // No auto-advance — user taps the Next button to move on their own time
 
       // auto-advance to next LOCATION when current is complete
       if(locComplete(v2,loc)){
@@ -1758,9 +1954,29 @@ function showCount(){
       }
     };
     input.onclick=e=>e.stopPropagation();
+  });
 
+  // Inline Next arrow — always visible in the row, moves to the next open field
+  document.querySelectorAll('.NextRowBtn').forEach(btn=>{
+    btn.onclick=e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      const [bvk,bloc,bidx]=btn.dataset.nextfor.split('|');
+      // find this row's Order input as the anchor point
+      const anchor=allInputs.find(x=>x.dataset.vk===bvk && x.dataset.loc===bloc && x.dataset.idx===bidx && x.dataset.f==='order');
+      const anchorIdx = anchor ? allInputs.indexOf(anchor) : -1;
+      for(let j=anchorIdx+1;j<allInputs.length;j++){
+        if(!allInputs[j].disabled){
+          allInputs[j].focus();
+          allInputs[j].scrollIntoView({block:'center',behavior:'smooth'});
+          return;
+        }
+      }
+      document.activeElement?.blur();
+    };
   });
 }
+
 
 function scrollToBlock(li){
   const el=document.getElementById('lb-'+li);
@@ -2025,6 +2241,17 @@ function doPrint(vk, mode){
   logOrderToCloud(vk, mode);
   window.print();
 }
+
+// 7-tap the trailing "s" in Zazzo's (any screen) = hidden dashboard
+let _dashTaps=0, _dashTapT=null;
+document.addEventListener('click', e=>{
+  const t=e.target;
+  if(t && t.classList && t.classList.contains('secretS')){
+    _dashTaps++; clearTimeout(_dashTapT);
+    _dashTapT=setTimeout(()=>_dashTaps=0,3000);
+    if(_dashTaps>=7){ _dashTaps=0; dashWeekOffset=0; showDashboard(); }
+  }
+});
 
 // ─── BOOT ────────────────────────────────────────────────────────────────────
 showLogin();
