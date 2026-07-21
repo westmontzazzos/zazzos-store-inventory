@@ -427,12 +427,16 @@ const DATA = {
   ]},
 
   bread:{name:"Bread",emoji:"🍞",sub:"Bakery",items:[
-    {loc:"Bread",item:"Extra Longs",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
-    {loc:"Bread",item:"Sourdough Torpedo",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
-    {loc:"Bread",item:"4 Inch Rolls",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
-    {loc:"Bread",item:"Hamburger Buns",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
-    {loc:"Bread",item:"Bread Crumbs",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
-    {loc:"Bread",item:"Filone",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
+    {loc:"Freezer",item:"Hamburger Buns",num:"—",par:"3"},
+    {loc:"Freezer",item:"Filone",num:"—",par:"3"},
+    {loc:"Freezer",item:"4 Inch Rolls",num:"—",par:"4"},
+    {loc:"Freezer",item:"Sourdough Torpedo",num:"—",par:"4"},
+    {loc:"Freezer",item:"Bread Crumbs",num:"—",par:"1"},
+    {loc:"Line",item:"Extra Longs",num:"—",par:"—"},
+    {loc:"Line",item:"Sourdough Torpedo",num:"—",par:"—"},
+    {loc:"Line",item:"Hamburger Buns",num:"—",par:"—"},
+    {loc:"Line",item:"Filone",num:"—",par:"—"},
+    {loc:"Line",item:"4 Inch Rolls",num:"—",par:"—"},
   ]}
 },
   darien: {
@@ -745,7 +749,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '6.1';
+const APP_VERSION = '7.0';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -907,17 +911,13 @@ function showLogin(){
             <div class="LCard-role">${v.name}</div>
             <div class="LCard-sub">${v.sub}</div>
           </div>`).join('')}
-        <div id="hiddenTap" style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:60px;height:60px;z-index:10;"></div>
       </div>
-      <button class="B B-outline" id="bSwitchLoc">⇄ Switch Location</button>
+      <div style="display:flex;gap:8px;width:100%;max-width:320px;">
+        <button class="B B-outline" style="flex:1;" id="bSwitchLoc">⇄ Switch Location</button>
+        <button class="B B-outline" style="flex:1;" id="bAddonLogBtn">📋 Add-Ons Log</button>
+      </div>
     </div>`;
 
-  let _ht=0,_htT=null;
-  document.getElementById('hiddenTap').addEventListener('click',()=>{
-    _ht++; clearTimeout(_htT);
-    _htT=setTimeout(()=>_ht=0,3000);
-    if(_ht>=7){ _ht=0; showAddonLog(); }
-  });
 
   let _so=0,_soT=null;
   document.getElementById('secretO')?.addEventListener('click',()=>{
@@ -942,13 +942,27 @@ function showLogin(){
   });
 
   document.getElementById('bSwitchLoc')?.addEventListener('click',()=>{ currentLoc=null; VENDORS=null; showLogin(); });
+  document.getElementById('bAddonLogBtn')?.addEventListener('click',()=>{ showAddonLog(); });
 
   document.querySelectorAll('.LCard[data-vk]').forEach(el=>{
     el.onclick=()=>{
       activeVendor=el.dataset.vk;
 
       if(activeVendor==='bread'){
-        if(needsBreadParSetup()){
+        if(currentLoc==='westmont'){
+          if(completed['bread']){
+            showModal('Order Already Completed',
+              'This order was marked complete. What would you like to do?',
+              [
+                {l:'Review Order',c:'B-outline',fn:()=>{ closeModal(); reviewMode=true; showCount(); }},
+                {l:'Edit Order',c:'B-red',fn:()=>{ closeModal(); reviewMode=false; enterBread(); }}
+              ]
+            );
+          } else {
+            reviewMode=false;
+            enterBread();
+          }
+        } else if(needsBreadParSetup()){
           showBreadParSetup(()=>enterBread());
         } else {
           enterBread();
@@ -1072,28 +1086,362 @@ const BREAD_STANDING_ORDER = {
   'Sourdough Torpedo':  {0:8, 1:6, 2:6, 3:8, 4:8, 5:10, 6:10}, // Mini
 };
 
-function enterBread(){
-  const today=new Date();
-  const dow=today.getDay(); // 0=Sun..6=Sat
+// ─── WESTMONT-ONLY BREAD FLOW: Freezer/Breadcrumb → low-stock → standing order → Line ──
+const WM_FREEZER_ITEMS = [
+  {item:'Hamburger Buns', par:3},
+  {item:'Filone', par:3},
+  {item:'4 Inch Rolls', par:4},
+  {item:'Sourdough Torpedo', par:4},
+];
+const WM_BREAD_CRUMBS_PAR = 1;
+const WM_BREAD_CRUMBS_LOW_THRESHOLD = 0.25;
+const WM_LINE_STANDING = {
+  'Extra Longs':       {0:9, 1:6, 2:6, 3:7, 4:7, 5:11, 6:11},
+  'Sourdough Torpedo':  {0:8, 1:6, 2:6, 3:8, 4:8, 5:10, 6:10},
+};
+function wmLineBunFilonePar(dow2){ return (dow2>=1 && dow2<=4) ? 2 : 3; }
 
+let wmBread = null; // reset each time Bread is opened at Westmont
+
+function enterBreadWestmont(){
+  wmBread = {
+    freezerCounts: {},
+    breadCrumbsOnHand: '',
+    breadCrumbsOrder: 0,
+    lowItems: [],
+    standingChoice: null,
+    lineCounts: {},
+    lineExtras: {},
+  };
+  showWmFreezerScreen();
+}
+
+function showWmFreezerScreen(){
+  const bcVal = wmBread.breadCrumbsOnHand;
+  const bcLow = bcVal!=='' && Number(bcVal) < WM_BREAD_CRUMBS_LOW_THRESHOLD;
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"><button class="B B-ghost" id="bWmBack">← Home</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Step 1 — Freezer / Breadcrumb</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Freezer / Breadcrumb Counts</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Enter what's on hand for every item, even if nothing is needed.</div>
+      <div class="LocBlock">
+        ${WM_FREEZER_ITEMS.map(f=>{
+          const val = wmBread.freezerCounts[f.item] ?? '';
+          const isLow = val!=='' && Number(val) < f.par;
+          return `<div class="ProdRow">
+            <div class="ProdRow-info">
+              <div class="ProdRow-name">${f.item}</div>
+              <div class="ProdRow-meta">PAR: ${f.par}</div>
+            </div>
+            <div class="DualInput">
+              <div class="IG"><label>On Hand</label>
+                <input class="SI${val!==''?(isLow?'':' filled'):''}" style="${isLow?'background:#FDECEA;border-color:#C8102E;color:#C8102E;':''}" type="number" min="0" step="0.25" inputmode="decimal"
+                  data-wmfreezer="${f.item}" value="${val}" placeholder="0">
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="LocBlock" style="margin-top:14px;">
+        <div class="ProdRow">
+          <div class="ProdRow-info">
+            <div class="ProdRow-name">Bread Crumbs</div>
+            <div class="ProdRow-meta">PAR: ${WM_BREAD_CRUMBS_PAR} (25 lb bag)</div>
+          </div>
+          <div class="DualInput">
+            <div class="IG"><label>On Hand</label>
+              <input class="SI${bcVal!==''?(bcLow?'':' filled'):''}" style="${bcLow?'background:#FDECEA;border-color:#C8102E;color:#C8102E;':''}" type="number" min="0" step="0.25" inputmode="decimal"
+                id="wmBcOnHand" value="${bcVal}" placeholder="0">
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="Footer no-print">
+      <button class="B B-red B-lg" style="width:100%;" id="bWmFreezerNext">Continue →</button>
+    </div>`;
+
+  document.getElementById('bWmBack').onclick = ()=>showLogin();
+
+  document.querySelectorAll('[data-wmfreezer]').forEach(inp=>{
+    inp.oninput = ()=>{
+      wmBread.freezerCounts[inp.dataset.wmfreezer] = inp.value;
+      showWmFreezerScreen();
+      setTimeout(()=>{
+        const el = document.querySelector(`[data-wmfreezer="${inp.dataset.wmfreezer}"]`);
+        if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+      },0);
+    };
+  });
+  document.getElementById('wmBcOnHand').oninput = (e)=>{
+    wmBread.breadCrumbsOnHand = e.target.value;
+    showWmFreezerScreen();
+    setTimeout(()=>{
+      const el = document.getElementById('wmBcOnHand');
+      if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
+    },0);
+  };
+
+  document.getElementById('bWmFreezerNext').onclick = ()=>{
+    const missing = WM_FREEZER_ITEMS.some(f => wmBread.freezerCounts[f.item]===undefined || wmBread.freezerCounts[f.item]==='');
+    if(missing){ showModal('Missing Counts','Please enter a count for every freezer item.',[{l:'OK',c:'B-red',fn:closeModal}]); return; }
+    if(wmBread.breadCrumbsOnHand===''){ showModal('Missing Count','Please enter On Hand for Bread Crumbs.',[{l:'OK',c:'B-red',fn:closeModal}]); return; }
+
+    wmBread.lowItems = WM_FREEZER_ITEMS.filter(f => Number(wmBread.freezerCounts[f.item]) < f.par)
+      .map(f => ({item:f.item, par:f.par, onHand:Number(wmBread.freezerCounts[f.item]), needed: f.par - Number(wmBread.freezerCounts[f.item])}));
+
+    wmProceedPastFreezer();
+  };
+}
+
+function wmProceedPastFreezer(){
+  const bcOnHand = Number(wmBread.breadCrumbsOnHand);
+  if(bcOnHand < WM_BREAD_CRUMBS_LOW_THRESHOLD){
+    showModal('⚠ Bread Crumbs Low',
+      `On Hand is <strong>${bcOnHand}</strong> — below the 0.25 threshold. Bread Crumbs is only used for two specific items, so this is your reminder to check if you're making them soon.<br><br>Add 1 (25 lb bag) to today's order?`,
+      [
+        {l:'No', c:'B-outline', fn:()=>{ closeModal(); wmBread.breadCrumbsOrder = 0; wmAfterBreadCrumbsCheck(); }},
+        {l:'Yes, Add 1', c:'B-red', fn:()=>{ closeModal(); wmBread.breadCrumbsOrder = 1; wmAfterBreadCrumbsCheck(); }},
+      ]
+    );
+  } else {
+    wmBread.breadCrumbsOrder = 0;
+    wmAfterBreadCrumbsCheck();
+  }
+}
+
+function wmAfterBreadCrumbsCheck(){
+  if(wmBread.lowItems.length>0) showWmLowStockScreen();
+  else showWmStandingChoiceScreen();
+}
+
+function showWmLowStockScreen(){
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="background:#C8102E;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Step 2 — Low Stock Detected</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">These freezer items are below par</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">They'll be added to today's order automatically.</div>
+      <div style="background:#fff;border:2px solid #C8102E;border-radius:10px;padding:14px 16px;">
+        <div style="font-family:'Libre Baskerville',Georgia,serif;font-weight:700;color:#C8102E;font-size:15px;margin-bottom:8px;">⚠ Add to Order</div>
+        ${wmBread.lowItems.map(li => `
+          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F5F5F5;font-size:13px;">
+            <span>${li.item}</span>
+            <span>On Hand: ${li.onHand} / Par: ${li.par} → <strong style="color:#C8102E;">Order ${li.needed}</strong></span>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="Footer no-print">
+      <button class="B B-red B-lg" style="width:100%;" id="bWmLowNext">Continue →</button>
+    </div>`;
+  document.getElementById('bWmLowNext').onclick = ()=>showWmStandingChoiceScreen();
+}
+
+function showWmStandingChoiceScreen(){
+  const today2 = new Date();
+  const dow2 = today2.getDay();
+  const dayNames2 = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Step 2 — Standing Order</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Is this the standing order?</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Today is <strong>${dayNames2[dow2]}</strong>. Standing order uses the fixed Line quantities for today.</div>
+      <div class="LocBlock" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+        <button class="B B-outline B-lg" style="width:100%;" id="bWmStandNo">No — Need Additional Items</button>
+        <button class="B B-red B-lg" style="width:100%;" id="bWmStandYes">Yes — Standing Order</button>
+      </div>
+    </div>`;
+
+  document.getElementById('bWmStandYes').onclick = ()=>{
+    wmBread.standingChoice = 'yes';
+    wmBread.lineCounts['Extra Longs'] = WM_LINE_STANDING['Extra Longs'][dow2];
+    wmBread.lineCounts['Sourdough Torpedo'] = WM_LINE_STANDING['Sourdough Torpedo'][dow2];
+    wmBread.lineCounts['Hamburger Buns'] = wmLineBunFilonePar(dow2);
+    wmBread.lineCounts['Filone'] = wmLineBunFilonePar(dow2);
+    wmFinishBreadOrder();
+  };
+  document.getElementById('bWmStandNo').onclick = ()=>{
+    wmBread.standingChoice = 'no';
+    showWmLineScreen();
+  };
+}
+
+function showWmLineScreen(){
+  const today2 = new Date();
+  const dow2 = today2.getDay();
+  const standingItems = [
+    {item:'Extra Longs', standingQty: WM_LINE_STANDING['Extra Longs'][dow2]},
+    {item:'Sourdough Torpedo', standingQty: WM_LINE_STANDING['Sourdough Torpedo'][dow2]},
+  ];
+  const additionalItems = [
+    {item:'Hamburger Buns', par: wmLineBunFilonePar(dow2)},
+    {item:'Filone', par: wmLineBunFilonePar(dow2)},
+    {item:'4 Inch Rolls', par: '—'},
+  ];
+  const lowByItem = {};
+  wmBread.lowItems.forEach(li => { lowByItem[li.item] = li.needed; });
+
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Step 3 — Line (Additional Items)</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Enter what you need on the Line</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Any item already covered by a standing quantity or freezer shortfall shows its baseline — just add extra on top.</div>
+
+      <div class="LocBlock">
+        <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#1B6B3A;text-transform:uppercase;letter-spacing:.04em;">Standing Order Items</div>
+        ${standingItems.map(li=>{
+          const extraVal = wmBread.lineExtras[li.item] ?? '';
+          return `<div class="ProdRow">
+            <div class="ProdRow-info">
+              <div class="ProdRow-name">${li.item}</div>
+              <div class="ProdRow-meta">Standing qty: <strong>${li.standingQty}</strong> (already included)</div>
+            </div>
+            <div class="DualInput">
+              <div class="IG"><label>+ Extra</label>
+                <input class="SI${extraVal!==''?' filled':''}" type="number" min="0" step="0.25" inputmode="decimal"
+                  data-wmextra="${li.item}" value="${extraVal}" placeholder="0">
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div class="LocBlock" style="margin-top:14px;">
+        <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:.04em;">Additional Items</div>
+        ${wmBread.breadCrumbsOrder > 0 ? `
+          <div class="ProdRow">
+            <div class="ProdRow-info">
+              <div class="ProdRow-name">Bread Crumbs</div>
+              <div class="ProdRow-meta">Low stock confirmed — added automatically</div>
+            </div>
+            <div style="font-weight:700;font-size:16px;color:#C8102E;">×${wmBread.breadCrumbsOrder}</div>
+          </div>` : ''}
+        ${additionalItems.map(li=>{
+          const baseline = lowByItem[li.item];
+          if(baseline !== undefined){
+            const extraVal = wmBread.lineExtras[li.item] ?? '';
+            return `<div class="ProdRow">
+              <div class="ProdRow-info">
+                <div class="ProdRow-name">${li.item}</div>
+                <div class="ProdRow-meta">Freezer shortfall: <strong>${baseline}</strong> already added (already included)</div>
+              </div>
+              <div class="DualInput">
+                <div class="IG"><label>+ Extra</label>
+                  <input class="SI${extraVal!==''?' filled':''}" type="number" min="0" step="0.25" inputmode="decimal"
+                    data-wmextra="${li.item}" value="${extraVal}" placeholder="0">
+                </div>
+              </div>
+            </div>`;
+          }
+          const val = wmBread.lineCounts[li.item] ?? '';
+          return `<div class="ProdRow">
+            <div class="ProdRow-info">
+              <div class="ProdRow-name">${li.item}</div>
+              <div class="ProdRow-meta">Standing par: ${li.par}</div>
+            </div>
+            <div class="DualInput">
+              <div class="IG"><label>Order</label>
+                <input class="SI${val!==''?' filled':''}" type="number" min="0" step="0.25" inputmode="decimal"
+                  data-wmline="${li.item}" value="${val}" placeholder="0">
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="Footer no-print">
+      <button class="B B-red B-lg" style="width:100%;" id="bWmLineDone">✓ Complete Order</button>
+    </div>`;
+
+  document.querySelectorAll('[data-wmextra]').forEach(inp=>{
+    inp.oninput = ()=>{ wmBread.lineExtras[inp.dataset.wmextra] = inp.value; };
+  });
+  document.querySelectorAll('[data-wmline]').forEach(inp=>{
+    inp.oninput = ()=>{ wmBread.lineCounts[inp.dataset.wmline] = inp.value; };
+  });
+  document.getElementById('bWmLineDone').onclick = ()=>{
+    standingItems.forEach(li=>{
+      const extra = Number(wmBread.lineExtras[li.item]) || 0;
+      wmBread.lineCounts[li.item] = li.standingQty + extra;
+    });
+    additionalItems.forEach(li=>{
+      const baseline = lowByItem[li.item];
+      if(baseline !== undefined){
+        const extra = Number(wmBread.lineExtras[li.item]) || 0;
+        wmBread.lineCounts[li.item] = baseline + extra;
+      }
+    });
+    wmFinishBreadOrder();
+  };
+}
+
+// Fold wmBread state into the real app's counts/completed/Supabase machinery for 'bread'
+async function wmFinishBreadOrder(){
+  const vk = 'bread';
+  activeVendor = vk;
+  if(!openLocs[vk]) openLocs[vk]=getLocs(vk)[0];
+
+  // Write freezer counts (On Hand) — Order = shortfall amount, or 0 if at/above par
+  WM_FREEZER_ITEMS.forEach(f=>{
+    const item = VENDORS.bread.items.find(i=>i.loc==='Freezer' && i.item===f.item);
+    if(!item) return;
+    setC(vk, item, 'oh', wmBread.freezerCounts[f.item]);
+    const low = wmBread.lowItems.find(li=>li.item===f.item);
+    setC(vk, item, 'order', low ? String(wmBread.lineCounts[f.item] ?? low.needed) : '0');
+  });
+
+  // Bread Crumbs
+  const bcItem = VENDORS.bread.items.find(i=>i.loc==='Freezer' && i.item==='Bread Crumbs');
+  if(bcItem){
+    setC(vk, bcItem, 'oh', wmBread.breadCrumbsOnHand);
+    setC(vk, bcItem, 'order', String(wmBread.breadCrumbsOrder||0));
+  }
+
+  // Line items
+  ['Extra Longs','Sourdough Torpedo','Hamburger Buns','Filone','4 Inch Rolls'].forEach(name=>{
+    const item = VENDORS.bread.items.find(i=>i.loc==='Line' && i.item===name);
+    if(!item) return;
+    const qty = wmBread.lineCounts[name];
+    if(qty!==undefined) setC(vk, item, 'order', String(qty));
+  });
+
+  // Identify who's doing this — reuse the normal verify/date flow, then auto-complete
+  const s = sess[vk];
+  if(s){
+    sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
+    await finishOrderComplete(vk);
+  } else {
+    pendingBreadAutoComplete = true;
+    showVerify(vk);
+  }
+}
+
+let pendingBreadAutoComplete = false;
+
+function enterBread(){
   if(currentLoc==='westmont'){
-    if(dow===6){
-      const sunDone = !!completed['bread_sunday'];
-      const monDone = !!completed['bread_monday'];
-      showModal('Saturday — Two Bread Orders',
-        'Saturday requires two separate Bread orders: one for Sunday delivery and one for Monday delivery. Both must be completed.',
-        [
-          {l:(sunDone?'✓ ':'')+'Sunday Delivery',c:sunDone?'B-outline':'B-red',fn:()=>{ closeModal(); askStandingOrder('sunday'); }},
-          {l:(monDone?'✓ ':'')+'Monday Delivery',c:monDone?'B-outline':'B-red',fn:()=>{ closeModal(); askStandingOrder('monday'); }}
-        ]
-      );
-    } else {
-      askStandingOrder(null);
-    }
+    enterBreadWestmont();
     return;
   }
 
-  // Darien: no standing order, same as before
+  // Darien: unchanged — per-day pars, optional Saturday dual order
+  const today=new Date();
+  const dow=today.getDay(); // 0=Sun..6=Sat
   if(dow===6){
     const sunDone = !!completed['bread_sunday'];
     const monDone = !!completed['bread_monday'];
@@ -1644,7 +1992,7 @@ function showShortcuts(){
   showModal('🤫 Hidden Shortcuts',
     `<div style="text-align:left;line-height:1.9;">
       <strong>Vendor name × 4</strong> (count screen header)<br>→ Free roam on/off — browse any location<br><br>
-      <strong>Center gap between vendor cards × 7</strong> (home)<br>→ Add-Ons Log<br><br>
+      <strong>📋 Add-Ons Log button</strong> (home, next to Switch Location)<br>→ Add-Ons Log — now a real button, no longer hidden<br><br>
       <strong>Location name × 6</strong> (home, under Zazzo's)<br>→ Order History & averages<br><br>
       <strong>Lock icon × 4</strong> (Westmont password screen)<br>→ Unlocks Westmont — the password field is fake<br><br>
       <strong>The "o" in Zazzo's × 5</strong> (home)<br>→ This list
@@ -1912,7 +2260,12 @@ function showDateEntry(vk, user){
     sessionUser = user;
     sess[vk] = {user, orderDate: currentDate, deliveryDate};
     saveState();
-    showCount();
+    if(pendingBreadAutoComplete){
+      pendingBreadAutoComplete = false;
+      finishOrderComplete(vk);
+    } else {
+      showCount();
+    }
   };
   document.getElementById('bBackDate').onclick=()=>showVerify(vk);
 }
@@ -1940,7 +2293,7 @@ function showCount(){
       const oh=getC(vk,item,'oh'), or=getC(vk,item,'order');
       const prevDone = !SEQ() || items.slice(0,idx).every(p=>getC(vk,p,'oh')!=='' && getC(vk,p,'order')!=='');
       const missingNum = item.num==='—' || item.num==='' || item.num==='WESTMONT';
-      const displayPar = vk.startsWith('bread') ? item[breadParFieldFor(vk)] : item.par;
+      const displayPar = (vk.startsWith('bread') && item[breadParFieldFor(vk)]!==undefined) ? item[breadParFieldFor(vk)] : item.par;
       const meta = (item.num!=='—'?'#'+item.num+' · ':'')+'PAR: '+displayPar;
       const nameStyle = missingNum ? 'background:#FFF59D;border-radius:3px;padding:0 3px;display:inline-block;' : '';
       return `<div class="ProdRow" data-name="${item.item.toLowerCase()}">
@@ -2314,7 +2667,7 @@ function doPrint(vk, mode){
       items.forEach(item=>{
         const oh=mode==='blank'?'':getC(vk,item,'oh');
         const or=mode==='blank'?'':getC(vk,item,'order');
-        const printPar = vk.startsWith('bread') ? item[breadParFieldFor(vk)] : item.par;
+        const printPar = (vk.startsWith('bread') && item[breadParFieldFor(vk)]!==undefined) ? item[breadParFieldFor(vk)] : item.par;
         tableRows+=`<tr>
           <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;font-family:'Inter',system-ui,sans-serif;">${item.item}</td>
           <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;color:#555;font-family:'Inter',system-ui,sans-serif;">${item.num}</td>
@@ -2397,7 +2750,7 @@ function doPrint(vk, mode){
   let alertRows='';
   if(currentLoc==='darien' && mode!=='blank'){
     vdef(vk).items.forEach(item=>{
-      const parRaw = vk.startsWith('bread') ? item[breadParFieldFor(vk)] : item.par;
+      const parRaw = (vk.startsWith('bread') && item[breadParFieldFor(vk)]!==undefined) ? item[breadParFieldFor(vk)] : item.par;
       const parNum=parseFloat(parRaw);
       if(isNaN(parNum)) return;
       const oh=parseFloat(getC(vk,item,'oh'))||0;
