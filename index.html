@@ -745,7 +745,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '6.0';
+const APP_VERSION = '6.1';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -926,6 +926,13 @@ function showLogin(){
     if(_so>=5){ _so=0; showShortcuts(); }
   });
 
+  let _sa=0,_saT=null;
+  document.querySelector('.secretA')?.addEventListener('click',()=>{
+    _sa++; clearTimeout(_saT);
+    _saT=setTimeout(()=>_sa=0,2500);
+    if(_sa>=8){ _sa=0; showRawLogDebug(); }
+  });
+
   // 6-tap location title = order history report
   let _oh=0,_ohT=null;
   document.getElementById('locTitle')?.addEventListener('click',()=>{
@@ -1059,11 +1066,35 @@ function breadParFieldFor(vk){
   return breadParFieldForDow(new Date().getDay());
 }
 
+// Westmont's standing Bread order — quantities per delivery day (0=Sun..6=Sat)
+const BREAD_STANDING_ORDER = {
+  'Extra Longs':       {0:9, 1:6, 2:6, 3:7, 4:7, 5:11, 6:11}, // XL
+  'Sourdough Torpedo':  {0:8, 1:6, 2:6, 3:8, 4:8, 5:10, 6:10}, // Mini
+};
+
 function enterBread(){
   const today=new Date();
   const dow=today.getDay(); // 0=Sun..6=Sat
+
+  if(currentLoc==='westmont'){
+    if(dow===6){
+      const sunDone = !!completed['bread_sunday'];
+      const monDone = !!completed['bread_monday'];
+      showModal('Saturday — Two Bread Orders',
+        'Saturday requires two separate Bread orders: one for Sunday delivery and one for Monday delivery. Both must be completed.',
+        [
+          {l:(sunDone?'✓ ':'')+'Sunday Delivery',c:sunDone?'B-outline':'B-red',fn:()=>{ closeModal(); askStandingOrder('sunday'); }},
+          {l:(monDone?'✓ ':'')+'Monday Delivery',c:monDone?'B-outline':'B-red',fn:()=>{ closeModal(); askStandingOrder('monday'); }}
+        ]
+      );
+    } else {
+      askStandingOrder(null);
+    }
+    return;
+  }
+
+  // Darien: no standing order, same as before
   if(dow===6){
-    // Saturday: two separate orders — one for Sunday delivery, one for Monday delivery
     const sunDone = !!completed['bread_sunday'];
     const monDone = !!completed['bread_monday'];
     showModal('Saturday — Two Bread Orders',
@@ -1078,14 +1109,35 @@ function enterBread(){
   }
 }
 
-let breadOrderTag = null; // null | 'sunday' | 'monday' — distinguishes Saturday's two orders
+// Which day of week this Bread order is actually FOR (delivery day), given the Saturday tag
+function breadDeliveryDow(tag){
+  const today=new Date();
+  if(tag==='sunday') return 0;
+  if(tag==='monday') return 1;
+  return today.getDay();
+}
 
-function startBreadOrder(tag){
+function askStandingOrder(tag){
+  showModal('Standing Order?',
+    'Is this the standing Bread order, or do you need additional items?',
+    [
+      {l:'No — Additional Items',c:'B-outline',fn:()=>{ closeModal(); startBreadOrder(tag); }},
+      {l:'Yes — Standing Order',c:'B-red',fn:()=>{ closeModal(); startBreadOrder(tag, true); }}
+    ]
+  );
+}
+
+let pendingStandingOrderVk = null; // set when the user chose "standing order", applied once showCount renders
+
+function startBreadOrder(tag, useStanding){
   breadOrderTag = tag;
   const vk = 'bread'+(tag?'_'+tag:'');
   activeVendor = vk;
   ensureBreadAliasState(vk);
   if(!openLocs[vk]) openLocs[vk]=getLocs('bread')[0];
+
+  if(useStanding) pendingStandingOrderVk = vk;
+
   const s = sess[vk];
   if(s){
     sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
@@ -1093,6 +1145,20 @@ function startBreadOrder(tag){
   } else {
     showVerify(vk);
   }
+}
+
+function applyPendingStandingOrder(){
+  if(!pendingStandingOrderVk) return;
+  const vk = pendingStandingOrderVk;
+  pendingStandingOrderVk = null;
+  const dow = breadDeliveryDow(breadOrderTag);
+  vdef(vk).items.forEach(item=>{
+    const std = BREAD_STANDING_ORDER[item.item];
+    if(std && std[dow]!==undefined){
+      setC(vk, item, 'oh', '0');
+      setC(vk, item, 'order', String(std[dow]));
+    }
+  });
 }
 
 // Saturday needs two independent Bread orders (Sun delivery + Mon delivery).
@@ -1556,6 +1622,22 @@ async function showOrderHistory(){
       out.innerHTML='Could not reach the database. Check your connection.';
     }
   }
+}
+
+function showRawLogDebug(){
+  let out = `<div style="text-align:left;font-size:11px;line-height:1.6;font-family:monospace;">`;
+  ['westmont','darien'].forEach(store=>{
+    let log = [];
+    try{ log = JSON.parse(localStorage.getItem('zaz_store_log_'+store)||'[]'); }catch(e){}
+    out += `<strong style="font-size:13px;">${store.toUpperCase()} (${log.length} entries)</strong><br>`;
+    if(log.length===0) out += `<em>empty</em><br>`;
+    log.forEach(e=>{
+      out += `${e.vendor} | orderDate:${e.orderDate} | completionDate:${e.completionDate} | completedAt:${e.completedAt}<br>`;
+    });
+    out += `<br>`;
+  });
+  out += `</div>`;
+  showModal('🔍 Raw Log Data', out, [{l:'Close',c:'B-red',fn:closeModal}]);
 }
 
 function showShortcuts(){
