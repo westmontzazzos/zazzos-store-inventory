@@ -749,7 +749,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '7.7';
+const APP_VERSION = '7.8';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1105,6 +1105,12 @@ function wmItem(loc, name){ return VENDORS.bread.items.find(i=>i.loc===loc && i.
 
 function enterBreadWestmont(){
   activeVendor = 'bread';
+  // If today's order was never completed, this is a fresh count — wipe any stale leftover
+  // values from a previous test/session so old numbers can't silently reappear.
+  if(!completed['bread']){
+    counts['bread'] = {};
+    saveState();
+  }
   showWmFreezerScreen();
 }
 
