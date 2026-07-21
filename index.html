@@ -435,6 +435,14 @@ const DATA = {
     {loc:"Extra",item:"Body Armor",num:"—",par:"—"},
     {loc:"Extra",item:"Powerade Zero Cherry",num:"—",par:"—"},
     {loc:"Extra",item:"Lemonade",num:"—",par:"—"},
+  ]},
+
+  bread:{name:"Bread",emoji:"🍞",sub:"Bakery",items:[
+    {loc:"Bread",item:"Extra Longs",num:"—",par:"—"},
+    {loc:"Bread",item:"Sourdough Torpedo",num:"—",par:"—"},
+    {loc:"Bread",item:"4 Inch Rolls",num:"—",par:"—"},
+    {loc:"Bread",item:"Hamburger Buns",num:"—",par:"—"},
+    {loc:"Bread",item:"Bread Crumbs",num:"—",par:"—"},
   ]}
 },
   darien: {
@@ -475,7 +483,6 @@ const DATA = {
     {loc:"Slicer Fzr",item:"Zucchini Italian",num:"301762",par:"1"},
     {loc:"Slicer Fzr",item:"Bacon Bites",num:"201889",par:"2"},
     {loc:"Slicer Fzr",item:"Frozen Mushrooms",num:"30177",par:"1"},
-    {loc:"Slicer Fzr",item:"Lasagna Sheets",num:"WESTMONT",par:"1"},
     {loc:"Slicer Fzr",item:"Sausage Link",num:"WESTMONT",par:"50"},
     {loc:"WIC",item:"Fresh Mozz",num:"19330",par:"1"},
     {loc:"WIC",item:"Ricotta Grande",num:"19541",par:"1"},
@@ -544,8 +551,6 @@ const DATA = {
     {loc:"Dry Oven Shelf",item:"Black G Bags",num:"70576",par:"1"},
     {loc:"Dry Oven Shelf",item:"Puree (6/10#)",num:"36110",par:"9"},
     {loc:"Dry Oven Shelf",item:"Perfeco/Magic (6/10#)",num:"36114",par:"3"},
-    {loc:"Dry Shelf Abv Slicer",item:"Red Wine Vin",num:"3811891",par:"1"},
-    {loc:"Dry Shelf Abv Slicer",item:"Balsamic",num:"38220",par:"1"},
     {loc:"Dry Shelf Abv Slicer",item:"Franks Red Hot",num:"38040",par:"2"},
     {loc:"Dry Shelf Abv Slicer",item:"Separating Italian (4/1)",num:"38117",par:"2"},
     {loc:"Dry Shelf Abv Slicer",item:"Bals Glaze",num:"38218",par:"1"},
@@ -566,7 +571,6 @@ const DATA = {
     {loc:"Kitchen Dept",item:"Seasoning Salt",num:"50639",par:"1"},
     {loc:"Kitchen Dept",item:"Lemon Pepper",num:"—",par:"1"},
     {loc:"Kitchen Dept",item:"Italian Seasoning",num:"—",par:"1"},
-    {loc:"Kitchen Dept",item:"Rosemary",num:"—",par:"1"},
     {loc:"Kitchen Dept",item:"Sand Wrap Paper",num:"70640",par:"1"},
     {loc:"Kitchen Dept",item:"Gloves",num:"52943",par:"—"},
     {loc:"Under Pizza Table",item:"Chicken Base 1#",num:"—",par:"3"},
@@ -741,11 +745,19 @@ const DATA = {
     {loc:"B.I.B",item:"Tea",num:"—",par:"1"},
     {loc:"B.I.B",item:"Cranberry",num:"—",par:"1"},
     {loc:"Extra",item:"Orange Juice",num:"—",par:"1"},
+  ]},
+
+  bread:{name:"Bread",emoji:"🍞",sub:"Bakery",items:[
+    {loc:"Bread",item:"Extra Longs",num:"—",par:"—"},
+    {loc:"Bread",item:"Sourdough Torpedo",num:"—",par:"—"},
+    {loc:"Bread",item:"4 Inch Rolls",num:"—",par:"—"},
+    {loc:"Bread",item:"Hamburger Buns",num:"—",par:"—"},
+    {loc:"Bread",item:"Bread Crumbs",num:"—",par:"—"},
   ]}
 }
 };
 let VENDORS = null;
-const APP_VERSION = '4.2';
+const APP_VERSION = '5.0';
 let currentLoc = null;
 let setupLoc = null;
 
@@ -818,7 +830,22 @@ function initLocation(loc){
   VENDORS = DATA[loc];
   counts = {}; openLocs = {}; addons = {}; sess = {};
   Object.keys(VENDORS).forEach(vk => { counts[vk]={}; openLocs[vk]=null; addons[vk]=[]; completed[vk]=null; });
+  restoreSavedPars();
   loadState();
+}
+
+function restoreSavedPars(){
+  try{
+    Object.keys(VENDORS).forEach(vk=>{
+      const raw=localStorage.getItem('zaz_par_values_'+currentLoc+'_'+vk);
+      if(!raw) return;
+      const saved=JSON.parse(raw); // { "loc|item": "parValue" }
+      VENDORS[vk].items.forEach(item=>{
+        const key=item.loc+'|'+item.item;
+        if(saved[key]!==undefined) item.par=saved[key];
+      });
+    });
+  }catch(e){}
 }
 
 function ikey(item){ return item.loc+'|'+item.item; }
@@ -979,20 +1006,80 @@ function showLogin(){
           showVerify(activeVendor);
         }
       };
-      if(completed[activeVendor]){
-        showModal('Order Already Completed',
-          'This order was marked complete. What would you like to do?',
-          [
-            {l:'Review Order',c:'B-outline',fn:()=>{ closeModal(); reviewMode=true; goIn(); }},
-            {l:'Edit Order',c:'B-red',fn:()=>{ closeModal(); reviewMode=false; goIn(); }}
-          ]
-        );
+      const proceedPastParCheck=()=>{
+        if(completed[activeVendor]){
+          showModal('Order Already Completed',
+            'This order was marked complete. What would you like to do?',
+            [
+              {l:'Review Order',c:'B-outline',fn:()=>{ closeModal(); reviewMode=true; goIn(); }},
+              {l:'Edit Order',c:'B-red',fn:()=>{ closeModal(); reviewMode=false; goIn(); }}
+            ]
+          );
+        } else {
+          reviewMode=false;
+          goIn();
+        }
+      };
+      if(needsParSetup(activeVendor)){
+        showParSetup(activeVendor, proceedPastParCheck);
       } else {
-        reviewMode=false;
-        goIn();
+        proceedPastParCheck();
       }
     };
   });
+}
+
+function needsParSetup(vk){
+  const parKey='zaz_pars_set_'+currentLoc+'_'+vk;
+  return !localStorage.getItem(parKey) && VENDORS[vk].items.some(i=>i.par==='—');
+}
+
+function showParSetup(vk, onDone){
+  const items=VENDORS[vk].items;
+  app.innerHTML=`
+    <header class="H no-print">
+      <div class="H-logo">Set Pars — ${VENDORS[vk].name}</div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="padding:12px 16px;font-size:12px;color:#777;">First time setup — enter the par (target stock level) for each item. This only needs to be done once.</div>
+      <div class="LocBlock">
+        <div class="ItemList">
+          ${items.map((item,idx)=>`
+            <div class="ProdRow">
+              <div class="ProdRow-info">
+                <div class="ProdRow-name">${item.item}</div>
+              </div>
+              <div class="DualInput">
+                <div class="IG"><label>Par</label>
+                  <input class="SI" type="number" min="0" step="0.1" inputmode="decimal" data-parsetidx="${idx}" placeholder="0">
+                </div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div style="padding:16px;">
+        <button class="B B-red B-lg" style="width:100%;" id="bParSetupDone">✓ Save Pars & Continue</button>
+      </div>
+    </div>`;
+
+  document.getElementById('bParSetupDone').onclick=()=>{
+    const inputs=[...document.querySelectorAll('[data-parsetidx]')];
+    const missing=inputs.some(i=>i.value.trim()==='');
+    if(missing){
+      inputs.forEach(i=>{ if(i.value.trim()==='') i.style.borderColor='#C8102E'; });
+      return;
+    }
+    const savedPars={};
+    inputs.forEach(i=>{
+      const idx=+i.dataset.parsetidx;
+      const val=i.value.trim();
+      items[idx].par = val;
+      savedPars[items[idx].loc+'|'+items[idx].item] = val;
+    });
+    localStorage.setItem('zaz_par_values_'+currentLoc+'_'+vk, JSON.stringify(savedPars));
+    localStorage.setItem('zaz_pars_set_'+currentLoc+'_'+vk, '1');
+    onDone();
+  };
 }
 
 function showPasswordGate(onSuccess, onBack){
