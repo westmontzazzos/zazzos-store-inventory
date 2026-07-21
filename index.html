@@ -749,7 +749,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '7.2';
+const APP_VERSION = '7.3';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1392,6 +1392,47 @@ function showWmLineScreen(){
 }
 
 // Fold wmBread state into the real app's counts/completed/Supabase machinery for 'bread'
+function showWmReviewScreen(){
+  const vk = 'bread';
+  const items = VENDORS.bread.items;
+  const orderedItems = items.filter(item => {
+    const or = getC(vk, item, 'order');
+    return or !== '' && or !== '0';
+  });
+
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"><button class="B B-ghost" id="bWmReviewHome">← Home</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Review Before Completing</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Order Summary</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Order Date: ${currentDate} · Delivery Date: ${deliveryDate} · Counted by: ${sessionUser}</div>
+      <div class="LocBlock">
+        ${orderedItems.length===0 ? `<div style="padding:16px;color:#777;">No items to order.</div>` :
+          orderedItems.map(item=>`
+            <div class="ProdRow">
+              <div class="ProdRow-info">
+                <div class="ProdRow-name">${item.item}</div>
+                <div class="ProdRow-meta">${item.loc}</div>
+              </div>
+              <div style="font-weight:700;font-size:16px;color:#C8102E;">×${getC(vk,item,'order')}</div>
+            </div>`).join('')}
+      </div>
+    </div>
+    <div class="Footer no-print" style="display:flex;gap:8px;">
+      <button class="B B-outline" style="flex:1;" id="bWmPrint">🖨 Print</button>
+      <button class="B B-red" style="flex:1;" id="bWmComplete">✓ Complete Order</button>
+    </div>`;
+
+  document.getElementById('bWmReviewHome').onclick = ()=>showLogin();
+  document.getElementById('bWmPrint').onclick = ()=>doPrint(vk, 'orderonly');
+  document.getElementById('bWmComplete').onclick = async ()=>{
+    await finishOrderComplete(vk);
+  };
+}
+
 async function wmFinishBreadOrder(){
   const vk = 'bread';
   activeVendor = vk;
@@ -1421,18 +1462,18 @@ async function wmFinishBreadOrder(){
     if(qty!==undefined) setC(vk, item, 'order', String(qty));
   });
 
-  // Identify who's doing this — reuse the normal verify/date flow, then auto-complete
+  // Identify who's doing this — reuse the normal verify/date flow, then show for review
   const s = sess[vk];
   if(s){
     sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
-    await finishOrderComplete(vk);
+    showWmReviewScreen();
   } else {
-    pendingBreadAutoComplete = true;
+    pendingBreadReview = true;
     showVerify(vk);
   }
 }
 
-let pendingBreadAutoComplete = false;
+let pendingBreadReview = false;
 
 function enterBread(){
   if(currentLoc==='westmont'){
@@ -2261,9 +2302,9 @@ function showDateEntry(vk, user){
     sessionUser = user;
     sess[vk] = {user, orderDate: currentDate, deliveryDate};
     saveState();
-    if(pendingBreadAutoComplete){
-      pendingBreadAutoComplete = false;
-      finishOrderComplete(vk);
+    if(pendingBreadReview){
+      pendingBreadReview = false;
+      showWmReviewScreen();
     } else {
       showCount();
     }
