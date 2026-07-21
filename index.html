@@ -438,11 +438,12 @@ const DATA = {
   ]},
 
   bread:{name:"Bread",emoji:"🍞",sub:"Bakery",items:[
-    {loc:"Bread",item:"Extra Longs",num:"—",par:"—"},
-    {loc:"Bread",item:"Sourdough Torpedo",num:"—",par:"—"},
-    {loc:"Bread",item:"4 Inch Rolls",num:"—",par:"—"},
-    {loc:"Bread",item:"Hamburger Buns",num:"—",par:"—"},
-    {loc:"Bread",item:"Bread Crumbs",num:"—",par:"—"},
+    {loc:"Bread",item:"Extra Longs",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
+    {loc:"Bread",item:"Sourdough Torpedo",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
+    {loc:"Bread",item:"4 Inch Rolls",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
+    {loc:"Bread",item:"Hamburger Buns",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
+    {loc:"Bread",item:"Bread Crumbs",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
+    {loc:"Bread",item:"Filone",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
   ]}
 },
   darien: {
@@ -748,16 +749,17 @@ const DATA = {
   ]},
 
   bread:{name:"Bread",emoji:"🍞",sub:"Bakery",items:[
-    {loc:"Bread",item:"Extra Longs",num:"—",par:"—"},
-    {loc:"Bread",item:"Sourdough Torpedo",num:"—",par:"—"},
-    {loc:"Bread",item:"4 Inch Rolls",num:"—",par:"—"},
-    {loc:"Bread",item:"Hamburger Buns",num:"—",par:"—"},
-    {loc:"Bread",item:"Bread Crumbs",num:"—",par:"—"},
+    {loc:"Bread",item:"Extra Longs",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
+    {loc:"Bread",item:"Sourdough Torpedo",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
+    {loc:"Bread",item:"4 Inch Rolls",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
+    {loc:"Bread",item:"Hamburger Buns",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
+    {loc:"Bread",item:"Bread Crumbs",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
+    {loc:"Bread",item:"Filone",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
   ]}
 }
 };
 let VENDORS = null;
-const APP_VERSION = '5.0';
+const APP_VERSION = '5.1';
 let currentLoc = null;
 let setupLoc = null;
 
@@ -830,35 +832,21 @@ function initLocation(loc){
   VENDORS = DATA[loc];
   counts = {}; openLocs = {}; addons = {}; sess = {};
   Object.keys(VENDORS).forEach(vk => { counts[vk]={}; openLocs[vk]=null; addons[vk]=[]; completed[vk]=null; });
-  restoreSavedPars();
+  restoreSavedBreadPars();
   loadState();
-}
-
-function restoreSavedPars(){
-  try{
-    Object.keys(VENDORS).forEach(vk=>{
-      const raw=localStorage.getItem('zaz_par_values_'+currentLoc+'_'+vk);
-      if(!raw) return;
-      const saved=JSON.parse(raw); // { "loc|item": "parValue" }
-      VENDORS[vk].items.forEach(item=>{
-        const key=item.loc+'|'+item.item;
-        if(saved[key]!==undefined) item.par=saved[key];
-      });
-    });
-  }catch(e){}
 }
 
 function ikey(item){ return item.loc+'|'+item.item; }
 function getC(vk,item,f){ return (counts[vk][ikey(item)]||{})[f]||''; }
 function setC(vk,item,f,v){ if(!counts[vk][ikey(item)]) counts[vk][ikey(item)]={}; counts[vk][ikey(item)][f]=v; saveState(); }
-function getLocs(vk){ return [...new Set(VENDORS[vk].items.map(i=>i.loc))].filter(l=>l!=='School Supplies'); }
-function getLocItems(vk,loc){ return VENDORS[vk].items.filter(i=>i.loc===loc); }
+function getLocs(vk){ return [...new Set(vdef(vk).items.map(i=>i.loc))].filter(l=>l!=='School Supplies'); }
+function getLocItems(vk,loc){ return vdef(vk).items.filter(i=>i.loc===loc); }
 function locFilledCount(vk,loc){ return getLocItems(vk,loc).filter(i=>getC(vk,i,'oh')!=='' && getC(vk,i,'order')!=='').length; }
 function locComplete(vk,loc){ const items=getLocItems(vk,loc); return items.length>0 && items.every(i=>getC(vk,i,'oh')!=='' && getC(vk,i,'order')!==''); }
 function prevComplete(vk,li){ return freeNav || li===0 || locComplete(vk,getLocs(vk)[li-1]); }
 function allComplete(vk){ return getLocs(vk).every(loc=>locComplete(vk,loc)); }
-function totalItems(vk){ return VENDORS[vk].items.filter(i=>i.loc!=='School Supplies').length; }
-function totalCounted(vk){ return VENDORS[vk].items.filter(i=>i.loc!=='School Supplies' && getC(vk,i,'oh')!=='' && getC(vk,i,'order')!=='').length; }
+function totalItems(vk){ return vdef(vk).items.filter(i=>i.loc!=='School Supplies').length; }
+function totalCounted(vk){ return vdef(vk).items.filter(i=>i.loc!=='School Supplies' && getC(vk,i,'oh')!=='' && getC(vk,i,'order')!=='').length; }
 
 const app = document.getElementById('app');
 
@@ -996,6 +984,16 @@ function showLogin(){
   document.querySelectorAll('.LCard[data-vk]').forEach(el=>{
     el.onclick=()=>{
       activeVendor=el.dataset.vk;
+
+      if(activeVendor==='bread'){
+        if(needsBreadParSetup()){
+          showBreadParSetup(()=>enterBread());
+        } else {
+          enterBread();
+        }
+        return;
+      }
+
       if(!openLocs[activeVendor]) openLocs[activeVendor]=getLocs(activeVendor)[0];
       const s = sess[activeVendor];
       const goIn=()=>{
@@ -1006,53 +1004,50 @@ function showLogin(){
           showVerify(activeVendor);
         }
       };
-      const proceedPastParCheck=()=>{
-        if(completed[activeVendor]){
-          showModal('Order Already Completed',
-            'This order was marked complete. What would you like to do?',
-            [
-              {l:'Review Order',c:'B-outline',fn:()=>{ closeModal(); reviewMode=true; goIn(); }},
-              {l:'Edit Order',c:'B-red',fn:()=>{ closeModal(); reviewMode=false; goIn(); }}
-            ]
-          );
-        } else {
-          reviewMode=false;
-          goIn();
-        }
-      };
-      if(needsParSetup(activeVendor)){
-        showParSetup(activeVendor, proceedPastParCheck);
+      if(completed[activeVendor]){
+        showModal('Order Already Completed',
+          'This order was marked complete. What would you like to do?',
+          [
+            {l:'Review Order',c:'B-outline',fn:()=>{ closeModal(); reviewMode=true; goIn(); }},
+            {l:'Edit Order',c:'B-red',fn:()=>{ closeModal(); reviewMode=false; goIn(); }}
+          ]
+        );
       } else {
-        proceedPastParCheck();
+        reviewMode=false;
+        goIn();
       }
     };
   });
 }
 
-function needsParSetup(vk){
-  const parKey='zaz_pars_set_'+currentLoc+'_'+vk;
-  return !localStorage.getItem(parKey) && VENDORS[vk].items.some(i=>i.par==='—');
+const BREAD_DAYS = ['parSun','parMon','parTue','parWed','parThu','parFri','parSat']; // index = JS getDay()
+const BREAD_DAY_LABELS = {parSun:'Sunday',parMon:'Monday',parTue:'Tuesday',parWed:'Wednesday',parThu:'Thursday',parFri:'Friday',parSat:'Saturday'};
+
+function needsBreadParSetup(){
+  const parKey='zaz_bread_pars_set_'+currentLoc;
+  return !localStorage.getItem(parKey);
 }
 
-function showParSetup(vk, onDone){
-  const items=VENDORS[vk].items;
+function showBreadParSetup(onDone){
+  const items=VENDORS.bread.items;
   app.innerHTML=`
     <header class="H no-print">
-      <div class="H-logo">Set Pars — ${VENDORS[vk].name}</div>
+      <div class="H-logo">Set Pars — Bread</div>
     </header>
     <div class="Page" style="margin-top:76px;">
-      <div style="padding:12px 16px;font-size:12px;color:#777;">First time setup — enter the par (target stock level) for each item. This only needs to be done once.</div>
+      <div style="padding:12px 16px;font-size:12px;color:#777;">First time setup — enter each item's par for every day of the week. This only needs to be done once.</div>
       <div class="LocBlock">
         <div class="ItemList">
           ${items.map((item,idx)=>`
-            <div class="ProdRow">
-              <div class="ProdRow-info">
+            <div class="ProdRow" style="flex-direction:column;align-items:stretch;">
+              <div class="ProdRow-info" style="margin-bottom:8px;">
                 <div class="ProdRow-name">${item.item}</div>
               </div>
-              <div class="DualInput">
-                <div class="IG"><label>Par</label>
-                  <input class="SI" type="number" min="0" step="0.1" inputmode="decimal" data-parsetidx="${idx}" placeholder="0">
-                </div>
+              <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+                ${BREAD_DAYS.map(field=>`
+                  <div class="IG"><label>${BREAD_DAY_LABELS[field].slice(0,3)}</label>
+                    <input class="SI" type="number" min="0" step="0.1" inputmode="decimal" data-parsetidx="${idx}" data-parfield="${field}" placeholder="0">
+                  </div>`).join('')}
               </div>
             </div>`).join('')}
         </div>
@@ -1072,14 +1067,91 @@ function showParSetup(vk, onDone){
     const savedPars={};
     inputs.forEach(i=>{
       const idx=+i.dataset.parsetidx;
+      const field=i.dataset.parfield;
       const val=i.value.trim();
-      items[idx].par = val;
-      savedPars[items[idx].loc+'|'+items[idx].item] = val;
+      items[idx][field] = val;
+      const key=items[idx].loc+'|'+items[idx].item+'|'+field;
+      savedPars[key] = val;
     });
-    localStorage.setItem('zaz_par_values_'+currentLoc+'_'+vk, JSON.stringify(savedPars));
-    localStorage.setItem('zaz_pars_set_'+currentLoc+'_'+vk, '1');
+    localStorage.setItem('zaz_bread_par_values_'+currentLoc, JSON.stringify(savedPars));
+    localStorage.setItem('zaz_bread_pars_set_'+currentLoc, '1');
     onDone();
   };
+}
+
+function restoreSavedBreadPars(){
+  try{
+    const raw=localStorage.getItem('zaz_bread_par_values_'+currentLoc);
+    if(!raw) return;
+    const saved=JSON.parse(raw);
+    VENDORS.bread.items.forEach(item=>{
+      BREAD_DAYS.forEach(field=>{
+        const key=item.loc+'|'+item.item+'|'+field;
+        if(saved[key]!==undefined) item[field]=saved[key];
+      });
+    });
+  }catch(e){}
+}
+
+// Which par field applies to a given day-of-week (0=Sun..6=Sat)
+function breadParFieldForDow(dow){ return BREAD_DAYS[dow]; }
+
+// Resolve which par field a Bread vendor-key should use (handles the two Saturday aliases)
+function breadParFieldFor(vk){
+  if(vk==='bread_sunday') return 'parSun';
+  if(vk==='bread_monday') return 'parMon';
+  return breadParFieldForDow(new Date().getDay());
+}
+
+function enterBread(){
+  const today=new Date();
+  const dow=today.getDay(); // 0=Sun..6=Sat
+  if(dow===6){
+    // Saturday: two separate orders — one for Sunday delivery, one for Monday delivery
+    const sunDone = !!completed['bread_sunday'];
+    const monDone = !!completed['bread_monday'];
+    showModal('Saturday — Two Bread Orders',
+      'Saturday requires two separate Bread orders: one for Sunday delivery and one for Monday delivery. Both must be completed.',
+      [
+        {l:(sunDone?'✓ ':'')+'Sunday Delivery',c:sunDone?'B-outline':'B-red',fn:()=>{ closeModal(); startBreadOrder('sunday'); }},
+        {l:(monDone?'✓ ':'')+'Monday Delivery',c:monDone?'B-outline':'B-red',fn:()=>{ closeModal(); startBreadOrder('monday'); }}
+      ]
+    );
+  } else {
+    startBreadOrder(null);
+  }
+}
+
+let breadOrderTag = null; // null | 'sunday' | 'monday' — distinguishes Saturday's two orders
+
+function startBreadOrder(tag){
+  breadOrderTag = tag;
+  const vk = 'bread'+(tag?'_'+tag:'');
+  activeVendor = vk;
+  ensureBreadAliasState(vk);
+  if(!openLocs[vk]) openLocs[vk]=getLocs('bread')[0];
+  const s = sess[vk];
+  if(s){
+    sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
+    showCount();
+  } else {
+    showVerify(vk);
+  }
+}
+
+// Saturday needs two independent Bread orders (Sun delivery + Mon delivery).
+// We register 'bread_sunday' / 'bread_monday' as their own vendor keys pointing at
+// the same item list, so every existing counts/addons/completed/sess mechanism works unchanged.
+const BREAD_ALIASES = {}; // 'bread_sunday' / 'bread_monday' -> synthetic vendor def, kept OUT of VENDORS
+function vdef(vk){ return VENDORS[vk] || BREAD_ALIASES[vk]; }
+
+function ensureBreadAliasState(vk){
+  if(vk!=='bread' && !BREAD_ALIASES[vk]){
+    BREAD_ALIASES[vk] = { name:'Bread ('+(vk.endsWith('sunday')?'Sun':'Mon')+' Delivery)', emoji:'🍞', sub:'Bakery', items:VENDORS.bread.items };
+  }
+  if(!counts[vk]) counts[vk]={};
+  if(!(vk in addons)) addons[vk]=[];
+  if(!(vk in completed)) completed[vk]=null;
 }
 
 function showPasswordGate(onSuccess, onBack){
@@ -1192,14 +1264,16 @@ function usToISO(us){
 async function finishOrderComplete(vk){
   completed[vk] = new Date().toISOString();
   saveState();
+  const todayISO = new Date().toISOString().slice(0,10); // dashboard always checks against real completion date
   try{
     const logKey='zaz_store_log_'+currentLoc;
     const log=JSON.parse(localStorage.getItem(logKey)||'[]');
     log.push({
-      vendor:VENDORS[vk].name,
+      vendor:vdef(vk).name,
       store:currentLoc,
       user:sessionUser||currentUser||'',
       orderDate:currentDate||'',
+      completionDate:todayISO,
       deliveryDate:deliveryDate||'',
       itemsOrdered:totalCounted(vk),
       addonCount:(addons[vk]||[]).length,
@@ -1212,7 +1286,7 @@ async function finishOrderComplete(vk){
 }
 
 function showSchoolSuppliesEntry(vk){
-  const items = VENDORS[vk].items.filter(i=>i.loc==='School Supplies');
+  const items = vdef(vk).items.filter(i=>i.loc==='School Supplies');
   app.innerHTML=`
     <header class="H no-print">
       <div class="H-logo">School Supplies</div>
@@ -1256,18 +1330,18 @@ function showSchoolSuppliesEntry(vk){
 
 async function pushOrderToSupabase(vk){
   try{
-    const batch = currentLoc+'|'+VENDORS[vk].name+'|'+(currentDate||'');
+    const batch = currentLoc+'|'+vdef(vk).name+'|'+(currentDate||'');
     // Remove old rows for this batch, then insert the current full set —
     // this represents "the order as it stands now" without touching other batches.
     await supa('inventory_orders?batch_id=eq.'+encodeURIComponent(batch), {method:'DELETE'});
     const rows=[];
-    VENDORS[vk].items.forEach(item=>{
+    vdef(vk).items.forEach(item=>{
       const or=getC(vk,item,'order');
       if(or!=='' && or!=='0'){
         rows.push({
           batch_id: batch,
           store: currentLoc,
-          vendor: VENDORS[vk].name,
+          vendor: vdef(vk).name,
           item: item.item,
           item_num: item.num,
           qty: parseFloat(or)||0,
@@ -1282,7 +1356,7 @@ async function pushOrderToSupabase(vk){
       rows.push({
         batch_id: batch,
         store: currentLoc,
-        vendor: VENDORS[vk].name,
+        vendor: vdef(vk).name,
         item: '[ADD-ON] '+a.name,
         item_num: '',
         qty: parseFloat(a.qty)||0,
@@ -1299,17 +1373,17 @@ async function pushOrderToSupabase(vk){
 async function logOrderToCloud(vk, mode){
   if(mode==='blank') return;
   try{
-    const batch = currentLoc+'|'+VENDORS[vk].name+'|'+(currentDate||'');
+    const batch = currentLoc+'|'+vdef(vk).name+'|'+(currentDate||'');
     // replace any previous log for same store+vendor+date (reprints don't duplicate)
     await supa('inventory_orders?batch_id=eq.'+encodeURIComponent(batch), {method:'DELETE'});
     const rows=[];
-    VENDORS[vk].items.forEach(item=>{
+    vdef(vk).items.forEach(item=>{
       const or=getC(vk,item,'order');
       if(or!=='' && or!=='0'){
         rows.push({
           batch_id: batch,
           store: currentLoc,
-          vendor: VENDORS[vk].name,
+          vendor: vdef(vk).name,
           item: item.item,
           item_num: item.num,
           qty: parseFloat(or)||0,
@@ -1324,7 +1398,7 @@ async function logOrderToCloud(vk, mode){
       rows.push({
         batch_id: batch,
         store: currentLoc,
-        vendor: VENDORS[vk].name,
+        vendor: vdef(vk).name,
         item: '[ADD-ON] '+a.name,
         item_num: '',
         qty: parseFloat(a.qty)||0,
@@ -1546,7 +1620,10 @@ function wasCompletedOn(vendorName, dateObj, store){
   const iso = dateObj.toISOString().slice(0,10);
   try{
     const log = JSON.parse(localStorage.getItem('zaz_store_log_'+store)||'[]');
-    return log.some(e=>e.vendor===vendorName && e.orderDate && usToISO(e.orderDate)===iso);
+    return log.some(e=>{
+      const d = e.completionDate || (e.orderDate ? usToISO(e.orderDate) : null);
+      return d===iso && (e.vendor===vendorName || (vendorName==='Bread' && e.vendor && e.vendor.startsWith('Bread')));
+    });
   }catch(e){ return false; }
 }
 
@@ -1554,7 +1631,10 @@ function findCompletedEntry(vendorName, dateObj, store){
   const iso = dateObj.toISOString().slice(0,10);
   try{
     const log = JSON.parse(localStorage.getItem('zaz_store_log_'+store)||'[]');
-    return log.find(e=>e.vendor===vendorName && e.orderDate && usToISO(e.orderDate)===iso) || null;
+    return log.find(e=>{
+      const d = e.completionDate || (e.orderDate ? usToISO(e.orderDate) : null);
+      return d===iso && (e.vendor===vendorName || (vendorName==='Bread' && e.vendor && e.vendor.startsWith('Bread')));
+    }) || null;
   }catch(e){ return null; }
 }
 
@@ -1771,7 +1851,7 @@ function showDateEntry(vk, user){
 
 // ─── COUNT ───────────────────────────────────────────────────────────────────
 function showCount(){
-  const vk=activeVendor, v=VENDORS[vk];
+  const vk=activeVendor, v=vdef(vk);
   const locs=getLocs(vk);
   const done=allComplete(vk);
   const counted=totalCounted(vk), total=totalItems(vk);
@@ -1792,7 +1872,8 @@ function showCount(){
       const oh=getC(vk,item,'oh'), or=getC(vk,item,'order');
       const prevDone = !SEQ() || items.slice(0,idx).every(p=>getC(vk,p,'oh')!=='' && getC(vk,p,'order')!=='');
       const missingNum = item.num==='—' || item.num==='' || item.num==='WESTMONT';
-      const meta = (item.num!=='—'?'#'+item.num+' · ':'')+'PAR: '+item.par;
+      const displayPar = vk.startsWith('bread') ? item[breadParFieldFor(vk)] : item.par;
+      const meta = (item.num!=='—'?'#'+item.num+' · ':'')+'PAR: '+displayPar;
       const nameStyle = missingNum ? 'background:#FFF59D;border-radius:3px;padding:0 3px;display:inline-block;' : '';
       return `<div class="ProdRow" data-name="${item.item.toLowerCase()}">
         <div class="ProdRow-info">
@@ -1867,7 +1948,7 @@ function showCount(){
         </div>
       </div>
       <div style="padding:16px;">
-        <button class="B B-red B-lg" style="width:100%;" id="bOrderComplete">✓ Order Complete</button>
+        <button class="B B-red B-lg" style="width:100%;" id="bOrderComplete">✓ Complete Order</button>
       </div>`}
     </div>
     <div class="Footer no-print">
@@ -1914,7 +1995,7 @@ function showCount(){
     // permanent add-on log
     try{
       const log=JSON.parse(localStorage.getItem('zaz_addon_log_'+currentLoc)||'[]');
-      log.push({vendor:VENDORS[vk].name,name,qty,user:sessionUser||currentUser||'',date:currentDate||new Date().toLocaleDateString('en-US')});
+      log.push({vendor:vdef(vk).name,name,qty,user:sessionUser||currentUser||'',date:currentDate||new Date().toLocaleDateString('en-US')});
       localStorage.setItem('zaz_addon_log_'+currentLoc,JSON.stringify(log));
     }catch(e){}
     showCount();
@@ -1935,7 +2016,7 @@ function showCount(){
         }},
         {l:'No, Finish',c:'B-red',fn:()=>{
           closeModal();
-          const hasSchoolSupplies = VENDORS[vk].items.some(i=>i.loc==='School Supplies');
+          const hasSchoolSupplies = vdef(vk).items.some(i=>i.loc==='School Supplies');
           if(hasSchoolSupplies){
             showModal('School Supplies?',
               'Do you need to order school supplies?',
@@ -2124,13 +2205,13 @@ function closeModal(){ document.getElementById('modal')?.remove(); }
 function showPrintChoice(vk){
   if(!completed[vk]){
     showModal('🚫 Printing Locked',
-      'This order has not been marked Complete. Press ✓ Order Complete before printing.',
+      'This order has not been marked Complete. Press ✓ Complete Order before printing.',
       [{l:'OK',c:'B-red',fn:closeModal}]
     );
     return;
   }
   showModal('Print Order',
-    'Choose what to print for '+VENDORS[vk].name+'.',
+    'Choose what to print for '+vdef(vk).name+'.',
     [
       {l:'Full Sheet',c:'B-outline',fn:()=>{ closeModal(); doPrint(vk,'full'); }},
       {l:'Order Only',c:'B-red',fn:()=>{ closeModal(); doPrint(vk,'orderonly'); }}
@@ -2140,7 +2221,7 @@ function showPrintChoice(vk){
 
 function doPrint(vk, mode){
   // mode: 'blank' | 'full' | 'orderonly'
-  const v=VENDORS[vk], locs=getLocs(vk);
+  const v=vdef(vk), locs=getLocs(vk);
   const date=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   let tableRows='';
   if(currentLoc==='darien'){
@@ -2165,10 +2246,11 @@ function doPrint(vk, mode){
       items.forEach(item=>{
         const oh=mode==='blank'?'':getC(vk,item,'oh');
         const or=mode==='blank'?'':getC(vk,item,'order');
+        const printPar = vk.startsWith('bread') ? item[breadParFieldFor(vk)] : item.par;
         tableRows+=`<tr>
           <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;font-family:'Inter',system-ui,sans-serif;">${item.item}</td>
           <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;color:#555;font-family:'Inter',system-ui,sans-serif;">${item.num}</td>
-          <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;color:#555;text-align:center;font-family:'Inter',system-ui,sans-serif;">${item.par}</td>
+          <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;color:#555;text-align:center;font-family:'Inter',system-ui,sans-serif;">${printPar}</td>
           <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;text-align:center;font-family:'Inter',system-ui,sans-serif;">${oh}</td>
           <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;text-align:center;font-weight:${or?'700':'400'};color:${or?'#C8102E':'#111'};font-family:'Inter',system-ui,sans-serif;">${or}</td>
         </tr>`;
@@ -2246,8 +2328,9 @@ function doPrint(vk, mode){
   // Par-exceeded alerts: OH + Order > Par
   let alertRows='';
   if(currentLoc==='darien' && mode!=='blank'){
-    VENDORS[vk].items.forEach(item=>{
-      const parNum=parseFloat(item.par);
+    vdef(vk).items.forEach(item=>{
+      const parRaw = vk.startsWith('bread') ? item[breadParFieldFor(vk)] : item.par;
+      const parNum=parseFloat(parRaw);
       if(isNaN(parNum)) return;
       const oh=parseFloat(getC(vk,item,'oh'))||0;
       const or=parseFloat(getC(vk,item,'order'))||0;
@@ -2255,7 +2338,7 @@ function doPrint(vk, mode){
       if(oh+or>parNum){
         alertRows+=`<tr>
           <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;font-weight:700;">${item.item}</td>
-          <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;">${item.par}</td>
+          <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;">${parRaw}</td>
           <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;">${oh}</td>
           <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;">${or}</td>
           <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;font-weight:700;color:#C8102E;">${oh+or}</td>
