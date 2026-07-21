@@ -749,7 +749,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '7.5';
+const APP_VERSION = '7.6';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -916,7 +916,6 @@ function showLogin(){
         <button class="B B-outline" style="flex:1;" id="bSwitchLoc">⇄ Switch Location</button>
         <button class="B B-outline" style="flex:1;" id="bAddonLogBtn">📋 Add-Ons Log</button>
       </div>
-      ${currentLoc==='westmont' ? `<button class="B B-outline" style="width:100%;max-width:320px;margin-top:8px;color:#C8102E;border-color:#C8102E;" id="bResetBreadTest">🗑 Reset Bread (Testing)</button>` : ''}
     </div>`;
 
 
@@ -944,22 +943,6 @@ function showLogin(){
 
   document.getElementById('bSwitchLoc')?.addEventListener('click',()=>{ currentLoc=null; VENDORS=null; showLogin(); });
   document.getElementById('bAddonLogBtn')?.addEventListener('click',()=>{ showAddonLog(); });
-  document.getElementById('bResetBreadTest')?.addEventListener('click',()=>{
-    showModal('Reset Bread?','This wipes today\'s Bread counts and completion status so you can test from scratch. Nothing else is affected.',
-      [
-        {l:'Cancel',c:'B-outline',fn:closeModal},
-        {l:'Reset',c:'B-red',fn:()=>{
-          closeModal();
-          counts['bread'] = {};
-          addons['bread'] = [];
-          completed['bread'] = null;
-          saveState();
-          showLogin();
-        }}
-      ]
-    );
-  });
-
   document.querySelectorAll('.LCard[data-vk]').forEach(el=>{
     el.onclick=()=>{
       activeVendor=el.dataset.vk;
