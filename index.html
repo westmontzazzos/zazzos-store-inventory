@@ -749,7 +749,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '7.1';
+const APP_VERSION = '7.2';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1170,20 +1170,21 @@ function showWmFreezerScreen(){
   document.querySelectorAll('[data-wmfreezer]').forEach(inp=>{
     inp.oninput = ()=>{
       wmBread.freezerCounts[inp.dataset.wmfreezer] = inp.value;
-      showWmFreezerScreen();
-      setTimeout(()=>{
-        const el = document.querySelector(`[data-wmfreezer="${inp.dataset.wmfreezer}"]`);
-        if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
-      },0);
+      const par = WM_FREEZER_ITEMS.find(f=>f.item===inp.dataset.wmfreezer).par;
+      const isLow = inp.value!=='' && Number(inp.value) < par;
+      inp.classList.toggle('filled', inp.value!=='' && !isLow);
+      inp.style.background = isLow ? '#FDECEA' : '';
+      inp.style.borderColor = isLow ? '#C8102E' : '';
+      inp.style.color = isLow ? '#C8102E' : '';
     };
   });
   document.getElementById('wmBcOnHand').oninput = (e)=>{
     wmBread.breadCrumbsOnHand = e.target.value;
-    showWmFreezerScreen();
-    setTimeout(()=>{
-      const el = document.getElementById('wmBcOnHand');
-      if(el){ el.focus(); el.setSelectionRange(el.value.length, el.value.length); }
-    },0);
+    const isLow = e.target.value!=='' && Number(e.target.value) < WM_BREAD_CRUMBS_LOW_THRESHOLD;
+    e.target.classList.toggle('filled', e.target.value!=='' && !isLow);
+    e.target.style.background = isLow ? '#FDECEA' : '';
+    e.target.style.borderColor = isLow ? '#C8102E' : '';
+    e.target.style.color = isLow ? '#C8102E' : '';
   };
 
   document.getElementById('bWmFreezerNext').onclick = ()=>{
