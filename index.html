@@ -749,7 +749,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '7.0';
+const APP_VERSION = '7.1';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1139,7 +1139,7 @@ function showWmFreezerScreen(){
             </div>
             <div class="DualInput">
               <div class="IG"><label>On Hand</label>
-                <input class="SI${val!==''?(isLow?'':' filled'):''}" style="${isLow?'background:#FDECEA;border-color:#C8102E;color:#C8102E;':''}" type="number" min="0" step="0.25" inputmode="decimal"
+                <input class="SI${val!==''?(isLow?'':' filled'):''}" style="${isLow?'background:#FDECEA;border-color:#C8102E;color:#C8102E;':''}" type="number" min="0" step="any" inputmode="decimal"
                   data-wmfreezer="${f.item}" value="${val}" placeholder="0">
               </div>
             </div>
@@ -1154,7 +1154,7 @@ function showWmFreezerScreen(){
           </div>
           <div class="DualInput">
             <div class="IG"><label>On Hand</label>
-              <input class="SI${bcVal!==''?(bcLow?'':' filled'):''}" style="${bcLow?'background:#FDECEA;border-color:#C8102E;color:#C8102E;':''}" type="number" min="0" step="0.25" inputmode="decimal"
+              <input class="SI${bcVal!==''?(bcLow?'':' filled'):''}" style="${bcLow?'background:#FDECEA;border-color:#C8102E;color:#C8102E;':''}" type="number" min="0" step="any" inputmode="decimal"
                 id="wmBcOnHand" value="${bcVal}" placeholder="0">
             </div>
           </div>
@@ -1313,7 +1313,7 @@ function showWmLineScreen(){
             </div>
             <div class="DualInput">
               <div class="IG"><label>+ Extra</label>
-                <input class="SI${extraVal!==''?' filled':''}" type="number" min="0" step="0.25" inputmode="decimal"
+                <input class="SI${extraVal!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
                   data-wmextra="${li.item}" value="${extraVal}" placeholder="0">
               </div>
             </div>
@@ -1342,7 +1342,7 @@ function showWmLineScreen(){
               </div>
               <div class="DualInput">
                 <div class="IG"><label>+ Extra</label>
-                  <input class="SI${extraVal!==''?' filled':''}" type="number" min="0" step="0.25" inputmode="decimal"
+                  <input class="SI${extraVal!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
                     data-wmextra="${li.item}" value="${extraVal}" placeholder="0">
                 </div>
               </div>
@@ -1356,7 +1356,7 @@ function showWmLineScreen(){
             </div>
             <div class="DualInput">
               <div class="IG"><label>Order</label>
-                <input class="SI${val!==''?' filled':''}" type="number" min="0" step="0.25" inputmode="decimal"
+                <input class="SI${val!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
                   data-wmline="${li.item}" value="${val}" placeholder="0">
               </div>
             </div>
