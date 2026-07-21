@@ -749,7 +749,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '7.6';
+const APP_VERSION = '7.7';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1231,7 +1231,7 @@ function wmProceedPastFreezer(){
 
 function wmAfterBreadCrumbsCheck(){
   if(wmGetLowItems().length>0) showWmLowStockScreen();
-  else showWmStandingChoiceScreen();
+  else showWmLineScreen();
 }
 
 function showWmLowStockScreen(){
@@ -1257,53 +1257,17 @@ function showWmLowStockScreen(){
     <div class="Footer no-print">
       <button class="B B-red B-lg" style="width:100%;" id="bWmLowNext">Continue →</button>
     </div>`;
-  document.getElementById('bWmLowNext').onclick = ()=>showWmStandingChoiceScreen();
-}
-
-function showWmStandingChoiceScreen(){
-  const vk = 'bread';
-  const today2 = new Date();
-  const dow2 = today2.getDay();
-  const dayNames2 = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  app.innerHTML = `
-    <header class="H no-print">
-      <div class="H-logo">Bread</div>
-      <div class="H-right"></div>
-    </header>
-    <div class="Page" style="margin-top:76px;">
-      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Step 2 — Standing Order</div>
-      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Is this the standing order?</div>
-      <div style="font-size:13px;color:#777;margin-bottom:18px;">Today is <strong>${dayNames2[dow2]}</strong>. Extra Longs and Sourdough Torpedo always use today's fixed standing quantity — no counting needed. This question only affects whether you count Hamburger Buns and Filone on the Line.</div>
-      <div class="LocBlock" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
-        <button class="B B-outline B-lg" style="width:100%;" id="bWmStandNo">No — Count the Line</button>
-        <button class="B B-red B-lg" style="width:100%;" id="bWmStandYes">Yes — Standing Order</button>
-      </div>
-    </div>`;
-
-  document.getElementById('bWmStandYes').onclick = ()=>{
-    const xlItem = wmItem('Line','Extra Longs'), stItem = wmItem('Line','Sourdough Torpedo');
-    const hbItem = wmItem('Line','Hamburger Buns'), flItem = wmItem('Line','Filone');
-    setC(vk, xlItem, 'order', String(WM_LINE_STANDING['Extra Longs'][dow2]));
-    setC(vk, stItem, 'order', String(WM_LINE_STANDING['Sourdough Torpedo'][dow2]));
-    const par = wmLineDayPar(dow2);
-    setC(vk, hbItem, 'oh', '0');
-    setC(vk, hbItem, 'order', String(par));
-    setC(vk, flItem, 'oh', '0');
-    setC(vk, flItem, 'order', String(par));
-    wmFinishBreadOrder();
-  };
-  document.getElementById('bWmStandNo').onclick = ()=>{
-    const xlItem = wmItem('Line','Extra Longs'), stItem = wmItem('Line','Sourdough Torpedo');
-    setC(vk, xlItem, 'order', String(WM_LINE_STANDING['Extra Longs'][dow2]));
-    setC(vk, stItem, 'order', String(WM_LINE_STANDING['Sourdough Torpedo'][dow2]));
-    showWmLineScreen();
-  };
+  document.getElementById('bWmLowNext').onclick = ()=>showWmLineScreen();
 }
 
 function showWmLineScreen(){
   const vk = 'bread';
   const today2 = new Date();
   const dow2 = today2.getDay();
+
+  // Extra Longs / Sourdough Torpedo are never counted — always the fixed standing number for today
+  setC(vk, wmItem('Line','Extra Longs'), 'order', String(WM_LINE_STANDING['Extra Longs'][dow2]));
+  setC(vk, wmItem('Line','Sourdough Torpedo'), 'order', String(WM_LINE_STANDING['Sourdough Torpedo'][dow2]));
   const par = wmLineDayPar(dow2);
   const lineItems = [
     {item:'Hamburger Buns', par},
