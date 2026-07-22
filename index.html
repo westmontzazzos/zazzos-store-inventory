@@ -749,7 +749,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '7.9';
+const APP_VERSION = '8.0';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1099,185 +1099,190 @@ const WM_LINE_STANDING = {
   'Sourdough Torpedo':  {0:8, 1:6, 2:6, 3:8, 4:8, 5:10, 6:10},
 };
 
-function wmLineDayPar(dow2){ return (dow2>=1 && dow2<=4) ? 2 : 3; } // Mon-Thu=2, Fri-Sun=3
-
 function wmItem(loc, name){ return VENDORS.bread.items.find(i=>i.loc===loc && i.item===name); }
+
+let wmAdditional = {}; // { "loc|item": "extra qty" } — transient, folded into order on Continue
 
 function enterBreadWestmont(){
   activeVendor = 'bread';
-  // If today's order was never completed, this is a fresh count — wipe any stale leftover
-  // values from a previous test/session so old numbers can't silently reappear.
   if(!completed['bread']){
     counts['bread'] = {};
     saveState();
   }
-  showWmFreezerScreen();
+  showWmCountScreen();
 }
 
-function showWmFreezerScreen(){
+// Fixed pars
+function wmLineDayPar(dow2){ return (dow2>=1 && dow2<=4) ? 2 : 3; } // Hamburger Buns / Filone: Mon-Thu=2, Fri-Sun=3
+
+const WM_ALL_COUNT_ITEMS = [
+  {loc:'Freezer', item:'Hamburger Buns', par:3},
+  {loc:'Freezer', item:'Filone', par:3},
+  {loc:'Freezer', item:'4 Inch Rolls', par:4},
+  {loc:'Freezer', item:'Sourdough Torpedo', par:4},
+  {loc:'Freezer', item:'Bread Crumbs', par:WM_BREAD_CRUMBS_PAR},
+  {loc:'Line', item:'Hamburger Buns', par:null}, // par depends on day, computed at render
+  {loc:'Line', item:'Filone', par:null},
+];
+
+// ─── STEP 1: One combined counting screen (Freezer + Breadcrumb + Line) ───────
+function showWmCountScreen(){
   const vk = 'bread';
-  const bcItem = wmItem('Freezer','Bread Crumbs');
-  const bcVal = getC(vk, bcItem, 'oh');
-  const bcLow = bcVal!=='' && Number(bcVal) < WM_BREAD_CRUMBS_LOW_THRESHOLD;
+  const today2 = new Date();
+  const dow2 = today2.getDay();
+  const lineDayPar = wmLineDayPar(dow2);
+
+  const rows = WM_ALL_COUNT_ITEMS.map(r => {
+    const par = r.par!==null ? r.par : lineDayPar;
+    const item = wmItem(r.loc, r.item);
+    return {...r, par, item};
+  });
+
   app.innerHTML = `
     <header class="H no-print">
       <div class="H-logo">Bread</div>
       <div class="H-right"><button class="B B-ghost" id="bWmBack">← Home</button></div>
     </header>
     <div class="Page" style="margin-top:76px;">
-      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Step 1 — Freezer / Breadcrumb</div>
-      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Freezer / Breadcrumb Counts</div>
-      <div style="font-size:13px;color:#777;margin-bottom:18px;">Enter what's on hand for every item, even if nothing is needed.</div>
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Step 1 — Counts</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Freezer, Breadcrumb &amp; Line Counts</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Enter On Hand for every item — freezer, breadcrumbs, and the line.</div>
+
       <div class="LocBlock">
-        ${WM_FREEZER_ITEMS.map(f=>{
-          const item = wmItem('Freezer', f.item);
-          const val = getC(vk, item, 'oh');
-          const isLow = val!=='' && Number(val) < f.par;
+        <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#1B6B3A;text-transform:uppercase;letter-spacing:.04em;">Freezer / Breadcrumb</div>
+        ${rows.filter(r=>r.loc==='Freezer').map(r=>{
+          const val = getC(vk, r.item, 'oh');
+          const isLow = val!=='' && Number(val) < r.par;
           return `<div class="ProdRow">
             <div class="ProdRow-info">
-              <div class="ProdRow-name">${f.item}</div>
-              <div class="ProdRow-meta">PAR: ${f.par}</div>
+              <div class="ProdRow-name">${r.item.item}</div>
+              <div class="ProdRow-meta">PAR: ${r.par}</div>
             </div>
             <div class="DualInput">
               <div class="IG"><label>On Hand</label>
                 <input class="SI${val!==''?(isLow?'':' filled'):''}" style="${isLow?'background:#FDECEA;border-color:#C8102E;color:#C8102E;':''}" type="number" min="0" step="any" inputmode="decimal"
-                  data-wmfreezer="${f.item}" value="${val}" placeholder="0">
+                  data-wmcount="${r.loc}|${r.item.item}" value="${val}" placeholder="0">
               </div>
             </div>
           </div>`;
         }).join('')}
       </div>
+
       <div class="LocBlock" style="margin-top:14px;">
-        <div class="ProdRow">
-          <div class="ProdRow-info">
-            <div class="ProdRow-name">Bread Crumbs</div>
-            <div class="ProdRow-meta">PAR: ${WM_BREAD_CRUMBS_PAR} (25 lb bag)</div>
-          </div>
-          <div class="DualInput">
-            <div class="IG"><label>On Hand</label>
-              <input class="SI${bcVal!==''?(bcLow?'':' filled'):''}" style="${bcLow?'background:#FDECEA;border-color:#C8102E;color:#C8102E;':''}" type="number" min="0" step="any" inputmode="decimal"
-                id="wmBcOnHand" value="${bcVal}" placeholder="0">
+        <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:.04em;">Line</div>
+        ${rows.filter(r=>r.loc==='Line').map(r=>{
+          const val = getC(vk, r.item, 'oh');
+          const isLow = val!=='' && Number(val) < r.par;
+          return `<div class="ProdRow">
+            <div class="ProdRow-info">
+              <div class="ProdRow-name">${r.item.item}</div>
+              <div class="ProdRow-meta">PAR: ${r.par}</div>
             </div>
-          </div>
-        </div>
+            <div class="DualInput">
+              <div class="IG"><label>On Hand</label>
+                <input class="SI${val!==''?(isLow?'':' filled'):''}" style="${isLow?'background:#FDECEA;border-color:#C8102E;color:#C8102E;':''}" type="number" min="0" step="any" inputmode="decimal"
+                  data-wmcount="${r.loc}|${r.item.item}" value="${val}" placeholder="0">
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
       </div>
     </div>
     <div class="Footer no-print">
-      <button class="B B-red B-lg" style="width:100%;" id="bWmFreezerNext">Continue →</button>
+      <button class="B B-red B-lg" style="width:100%;" id="bWmCountNext">Continue →</button>
     </div>`;
 
   document.getElementById('bWmBack').onclick = ()=>showLogin();
 
-  document.querySelectorAll('[data-wmfreezer]').forEach(inp=>{
+  document.querySelectorAll('[data-wmcount]').forEach(inp=>{
     inp.oninput = ()=>{
-      const item = wmItem('Freezer', inp.dataset.wmfreezer);
-      setC(vk, item, 'oh', inp.value);
-      const par = WM_FREEZER_ITEMS.find(f=>f.item===inp.dataset.wmfreezer).par;
-      const isLow = inp.value!=='' && Number(inp.value) < par;
+      const [loc,name] = inp.dataset.wmcount.split('|');
+      setC(vk, wmItem(loc,name), 'oh', inp.value);
+      const row = rows.find(r=>r.loc===loc && r.item.item===name);
+      const isLow = inp.value!=='' && Number(inp.value) < row.par;
       inp.classList.toggle('filled', inp.value!=='' && !isLow);
       inp.style.background = isLow ? '#FDECEA' : '';
       inp.style.borderColor = isLow ? '#C8102E' : '';
       inp.style.color = isLow ? '#C8102E' : '';
     };
   });
-  document.getElementById('wmBcOnHand').oninput = (e)=>{
-    setC(vk, bcItem, 'oh', e.target.value);
-    const isLow = e.target.value!=='' && Number(e.target.value) < WM_BREAD_CRUMBS_LOW_THRESHOLD;
-    e.target.classList.toggle('filled', e.target.value!=='' && !isLow);
-    e.target.style.background = isLow ? '#FDECEA' : '';
-    e.target.style.borderColor = isLow ? '#C8102E' : '';
-    e.target.style.color = isLow ? '#C8102E' : '';
-  };
 
-  document.getElementById('bWmFreezerNext').onclick = ()=>{
-    const missing = WM_FREEZER_ITEMS.some(f => getC(vk, wmItem('Freezer',f.item), 'oh')==='');
-    if(missing){ showModal('Missing Counts','Please enter a count for every freezer item.',[{l:'OK',c:'B-red',fn:closeModal}]); return; }
-    if(getC(vk, bcItem, 'oh')===''){ showModal('Missing Count','Please enter On Hand for Bread Crumbs.',[{l:'OK',c:'B-red',fn:closeModal}]); return; }
+  document.getElementById('bWmCountNext').onclick = ()=>{
+    const missing = rows.some(r => getC(vk, r.item, 'oh')==='');
+    if(missing){ showModal('Missing Counts','Please enter On Hand for every item.',[{l:'OK',c:'B-red',fn:closeModal}]); return; }
 
-    // Write freezer shortfall orders now
-    WM_FREEZER_ITEMS.forEach(f=>{
-      const item = wmItem('Freezer', f.item);
-      const oh = Number(getC(vk, item, 'oh'));
-      const needed = Math.max(0, f.par - oh);
-      setC(vk, item, 'order', String(needed));
+    // Compute "Needed" for every counted item and stash it as the order baseline
+    rows.forEach(r=>{
+      const oh = Number(getC(vk, r.item, 'oh'));
+      const needed = Math.max(0, r.par - oh);
+      setC(vk, r.item, 'order', String(needed)); // baseline; Additional gets added on top later
     });
 
-    wmProceedPastFreezer();
+    // Bread Crumbs low-stock confirmation (0.25 threshold) still applies
+    const bcItem = wmItem('Freezer','Bread Crumbs');
+    const bcOnHand = Number(getC(vk, bcItem, 'oh'));
+    if(bcOnHand < WM_BREAD_CRUMBS_LOW_THRESHOLD){
+      showModal('⚠ Bread Crumbs Low',
+        `On Hand is <strong>${bcOnHand}</strong> — below the 0.25 threshold. Bread Crumbs is only used for two specific items, so this is your reminder to check if you're making them soon.<br><br>Add 1 (25 lb bag) to today's order?`,
+        [
+          {l:'No', c:'B-outline', fn:()=>{ closeModal(); setC(vk, bcItem, 'order', String(Math.max(0, WM_BREAD_CRUMBS_PAR - bcOnHand))); showWmStandingChoiceScreen(); }},
+          {l:'Yes, Add 1', c:'B-red', fn:()=>{ closeModal(); setC(vk, bcItem, 'order', String(Math.max(1, WM_BREAD_CRUMBS_PAR - bcOnHand))); showWmStandingChoiceScreen(); }},
+        ]
+      );
+    } else {
+      showWmStandingChoiceScreen();
+    }
   };
 }
 
-function wmGetLowItems(){
+// ─── STEP 2: Standing Order vs Additional ─────────────────────────────────────
+function showWmStandingChoiceScreen(){
   const vk = 'bread';
-  return WM_FREEZER_ITEMS
-    .map(f=>{
-      const item = wmItem('Freezer', f.item);
-      const oh = Number(getC(vk, item, 'oh'));
-      return {item:f.item, par:f.par, onHand:oh, needed: Math.max(0, f.par-oh)};
-    })
-    .filter(li => li.needed>0);
-}
-
-function wmProceedPastFreezer(){
-  const vk = 'bread';
-  const bcItem = wmItem('Freezer','Bread Crumbs');
-  const bcOnHand = Number(getC(vk, bcItem, 'oh'));
-  if(bcOnHand < WM_BREAD_CRUMBS_LOW_THRESHOLD){
-    showModal('⚠ Bread Crumbs Low',
-      `On Hand is <strong>${bcOnHand}</strong> — below the 0.25 threshold. Bread Crumbs is only used for two specific items, so this is your reminder to check if you're making them soon.<br><br>Add 1 (25 lb bag) to today's order?`,
-      [
-        {l:'No', c:'B-outline', fn:()=>{ closeModal(); setC(vk, bcItem, 'order', '0'); wmAfterBreadCrumbsCheck(); }},
-        {l:'Yes, Add 1', c:'B-red', fn:()=>{ closeModal(); setC(vk, bcItem, 'order', '1'); wmAfterBreadCrumbsCheck(); }},
-      ]
-    );
-  } else {
-    setC(vk, bcItem, 'order', '0');
-    wmAfterBreadCrumbsCheck();
-  }
-}
-
-function wmAfterBreadCrumbsCheck(){
-  if(wmGetLowItems().length>0) showWmLowStockScreen();
-  else showWmLineScreen();
-}
-
-function showWmLowStockScreen(){
-  const lowItems = wmGetLowItems();
+  const today2 = new Date();
+  const dow2 = today2.getDay();
   app.innerHTML = `
     <header class="H no-print">
       <div class="H-logo">Bread</div>
       <div class="H-right"></div>
     </header>
     <div class="Page" style="margin-top:76px;">
-      <div style="background:#C8102E;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Step 2 — Low Stock Detected</div>
-      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">These freezer items are below par</div>
-      <div style="font-size:13px;color:#777;margin-bottom:18px;">They'll be added to today's order automatically.</div>
-      <div style="background:#fff;border:2px solid #C8102E;border-radius:10px;padding:14px 16px;">
-        <div style="font-family:'Libre Baskerville',Georgia,serif;font-weight:700;color:#C8102E;font-size:15px;margin-bottom:8px;">⚠ Add to Order</div>
-        ${lowItems.map(li => `
-          <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #F5F5F5;font-size:13px;">
-            <span>${li.item}</span>
-            <span>On Hand: ${li.onHand} / Par: ${li.par} → <strong style="color:#C8102E;">Order ${li.needed}</strong></span>
-          </div>`).join('')}
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Step 2 — Standing Order</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Standing order or additional?</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Standing Order locks Extra Longs and Sourdough Torpedo to today's fixed number. Additional lets you edit those, plus add more to anything else.</div>
+      <div class="LocBlock" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+        <button class="B B-red B-lg" style="width:100%;" id="bWmStandYes">Standing Order</button>
+        <button class="B B-outline B-lg" style="width:100%;" id="bWmStandNo">Additional</button>
       </div>
-    </div>
-    <div class="Footer no-print">
-      <button class="B B-red B-lg" style="width:100%;" id="bWmLowNext">Continue →</button>
     </div>`;
-  document.getElementById('bWmLowNext').onclick = ()=>showWmLineScreen();
+
+  const xlItem = wmItem('Line','Extra Longs'), stItem = wmItem('Line','Sourdough Torpedo');
+  setC(vk, xlItem, 'order', String(WM_LINE_STANDING['Extra Longs'][dow2]));
+  setC(vk, stItem, 'order', String(WM_LINE_STANDING['Sourdough Torpedo'][dow2]));
+
+  document.getElementById('bWmStandYes').onclick = ()=>{
+    showWmBreakdownScreen('standing');
+  };
+  document.getElementById('bWmStandNo').onclick = ()=>{
+    showWmBreakdownScreen('additional');
+  };
 }
 
-function showWmLineScreen(){
+// ─── STEP 3: Three-column breakdown (On Hand / Needed / Additional) ──────────
+function showWmBreakdownScreen(mode){
   const vk = 'bread';
-  const today2 = new Date();
-  const dow2 = today2.getDay();
+  const isStanding = mode==='standing';
 
-  // Extra Longs / Sourdough Torpedo are never counted — always the fixed standing number for today
-  setC(vk, wmItem('Line','Extra Longs'), 'order', String(WM_LINE_STANDING['Extra Longs'][dow2]));
-  setC(vk, wmItem('Line','Sourdough Torpedo'), 'order', String(WM_LINE_STANDING['Sourdough Torpedo'][dow2]));
-  const par = wmLineDayPar(dow2);
-  const lineItems = [
-    {item:'Hamburger Buns', par},
-    {item:'Filone', par},
+  const extraItems = [
+    {loc:'Line', item:'Extra Longs', locked: isStanding},
+    {loc:'Line', item:'Sourdough Torpedo', locked: isStanding},
+  ];
+  const breakdownItems = [
+    {loc:'Freezer', item:'Hamburger Buns'},
+    {loc:'Freezer', item:'Filone'},
+    {loc:'Freezer', item:'4 Inch Rolls'},
+    {loc:'Freezer', item:'Bread Crumbs'},
+    {loc:'Line', item:'Hamburger Buns'},
+    {loc:'Line', item:'Filone'},
   ];
 
   app.innerHTML = `
@@ -1286,61 +1291,84 @@ function showWmLineScreen(){
       <div class="H-right"></div>
     </header>
     <div class="Page" style="margin-top:76px;">
-      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Step 3 — Line Counts</div>
-      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Enter On Hand on the Line</div>
-      <div style="font-size:13px;color:#777;margin-bottom:18px;">Only Hamburger Buns and Filone are counted here. Order is calculated automatically.</div>
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Step 3 — Review &amp; Additional</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">${isStanding?'Standing Order':'Additional Order'}</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">${isStanding?'Extra Longs and Sourdough Torpedo are locked to today\'s standing quantity.':'Adjust Extra Longs and Sourdough Torpedo, or add more to anything else.'}</div>
 
       <div class="LocBlock">
-        ${lineItems.map(li=>{
-          const item = wmItem('Line', li.item);
-          const val = getC(vk, item, 'oh');
-          const order = val!=='' ? Math.max(0, li.par - Number(val)) : '';
+        <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#1B6B3A;text-transform:uppercase;letter-spacing:.04em;">Extra Longs &amp; Torpedo</div>
+        ${extraItems.map(r=>{
+          const item = wmItem(r.loc, r.item);
+          const val = getC(vk, item, 'order');
           return `<div class="ProdRow">
             <div class="ProdRow-info">
-              <div class="ProdRow-name">${li.item}</div>
-              <div class="ProdRow-meta">PAR: ${li.par}</div>
+              <div class="ProdRow-name">${r.item}</div>
+              <div class="ProdRow-meta">${r.locked?'Locked — standing quantity':'Editable'}</div>
             </div>
             <div class="DualInput">
-              <div class="IG"><label>On Hand</label>
-                <input class="SI${val!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
-                  data-wmlineoh="${li.item}" value="${val}" placeholder="0">
-              </div>
               <div class="IG"><label>Order</label>
-                <input class="SI" type="number" value="${order}" placeholder="0" disabled style="opacity:0.6;background:#F5F5F5;" data-wmlineorder="${li.item}">
+                <input class="SI${val!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
+                  data-wmextraline="${r.loc}|${r.item}" value="${val}" placeholder="0" ${r.locked?'disabled style="opacity:0.6;background:#F5F5F5;"':''}>
               </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <div class="LocBlock" style="margin-top:14px;">
+        <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:.04em;">Freezer &amp; Line Breakdown</div>
+        <div style="display:grid;grid-template-columns:1fr 60px 60px 70px;gap:4px;padding:8px 16px 4px;font-size:9px;font-weight:700;color:#777;text-transform:uppercase;">
+          <div></div><div style="text-align:center;">On Hand</div><div style="text-align:center;">Needed</div><div style="text-align:center;">+ Extra</div>
+        </div>
+        ${breakdownItems.map(r=>{
+          const item = wmItem(r.loc, r.item);
+          const oh = getC(vk, item, 'oh');
+          const needed = getC(vk, item, 'order'); // set in step 1 as baseline
+          const additionalKey = r.loc+'|'+r.item;
+          const additional = wmAdditional[additionalKey] ?? '';
+          return `<div class="ProdRow" style="padding:10px 16px;">
+            <div style="display:grid;grid-template-columns:1fr 60px 60px 70px;gap:4px;align-items:center;width:100%;">
+              <div>
+                <div class="ProdRow-name" style="font-size:13px;">${r.item}</div>
+                <div class="ProdRow-meta">${r.loc}</div>
+              </div>
+              <div style="text-align:center;font-weight:700;">${oh}</div>
+              <div style="text-align:center;font-weight:700;color:#1B6B3A;">${needed}</div>
+              <input class="SI" style="width:60px;height:36px;font-size:13px;" type="number" min="0" step="any" inputmode="decimal"
+                data-wmadditional="${additionalKey}" value="${additional}" placeholder="0">
             </div>
           </div>`;
         }).join('')}
       </div>
     </div>
     <div class="Footer no-print">
-      <button class="B B-red B-lg" style="width:100%;" id="bWmLineDone">Continue →</button>
+      <button class="B B-red B-lg" style="width:100%;" id="bWmBreakdownDone">Continue →</button>
     </div>`;
 
-  document.querySelectorAll('[data-wmlineoh]').forEach(inp=>{
+  document.querySelectorAll('[data-wmextraline]').forEach(inp=>{
     inp.oninput = ()=>{
-      const item = wmItem('Line', inp.dataset.wmlineoh);
-      setC(vk, item, 'oh', inp.value);
-      const li = lineItems.find(x=>x.item===inp.dataset.wmlineoh);
-      const order = inp.value!=='' ? Math.max(0, li.par - Number(inp.value)) : '';
-      const orderInput = document.querySelector(`[data-wmlineorder="${inp.dataset.wmlineoh}"]`);
-      if(orderInput) orderInput.value = order;
-      inp.classList.toggle('filled', inp.value!=='');
+      const [loc,name] = inp.dataset.wmextraline.split('|');
+      setC(vk, wmItem(loc,name), 'order', inp.value);
     };
   });
+  document.querySelectorAll('[data-wmadditional]').forEach(inp=>{
+    inp.oninput = ()=>{ wmAdditional[inp.dataset.wmadditional] = inp.value; };
+  });
 
-  document.getElementById('bWmLineDone').onclick = ()=>{
-    const missing = lineItems.some(li => getC(vk, wmItem('Line',li.item), 'oh')==='');
-    if(missing){ showModal('Missing Counts','Please enter On Hand for both Hamburger Buns and Filone.',[{l:'OK',c:'B-red',fn:closeModal}]); return; }
-    lineItems.forEach(li=>{
-      const item = wmItem('Line', li.item);
-      const onHand = Number(getC(vk, item, 'oh'));
-      setC(vk, item, 'order', String(Math.max(0, li.par - onHand)));
+  document.getElementById('bWmBreakdownDone').onclick = ()=>{
+    // Fold Needed + Additional into the final order for the breakdown items
+    breakdownItems.forEach(r=>{
+      const item = wmItem(r.loc, r.item);
+      const needed = Number(getC(vk, item, 'order')) || 0;
+      const additionalKey = r.loc+'|'+r.item;
+      const additional = Number(wmAdditional[additionalKey]) || 0;
+      setC(vk, item, 'order', String(needed + additional));
     });
     wmFinishBreadOrder();
   };
 }
 
+// ─── STEP 4: Review & Print ───────────────────────────────────────────────────
 function showWmReviewScreen(){
   const vk = 'bread';
   const items = VENDORS.bread.items;
@@ -1355,7 +1383,7 @@ function showWmReviewScreen(){
       <div class="H-right"><button class="B B-ghost" id="bWmReviewHome">← Home</button></div>
     </header>
     <div class="Page" style="margin-top:76px;">
-      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Review Before Completing</div>
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Final Order</div>
       <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Order Summary</div>
       <div style="font-size:13px;color:#777;margin-bottom:18px;">Order Date: ${currentDate} · Delivery Date: ${deliveryDate} · Counted by: ${sessionUser}</div>
       <div class="LocBlock">
@@ -1386,6 +1414,7 @@ async function wmFinishBreadOrder(){
   const vk = 'bread';
   activeVendor = vk;
   if(!openLocs[vk]) openLocs[vk]=getLocs(vk)[0];
+  wmAdditional = {}; // reset for next session
 
   const s = sess[vk];
   if(s){
