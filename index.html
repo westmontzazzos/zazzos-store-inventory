@@ -99,6 +99,9 @@
       @page{margin:0.5in;size:letter portrait;}
       body > *{display:none!important;}
       #print-area{display:block!important;}
+      #print-area table{page-break-inside:auto;}
+      #print-area tr{page-break-inside:avoid;page-break-after:auto;}
+      #print-area thead{display:table-header-group;}
     }
   </style>
 </head>
@@ -749,7 +752,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '8.0';
+const APP_VERSION = '8.1';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2521,6 +2524,22 @@ function showCount(){
 
       setC(v2,item,f,input.value);
       input.classList.toggle('filled',input.value!=='');
+
+      // Auto-populate Order from Par − On Hand, Westmont only. Still fully editable after.
+      if(f==='oh' && currentLoc==='westmont' && input.value!==''){
+        const parNum = parseFloat(item.par);
+        if(!isNaN(parNum)){
+          const ohNum = parseFloat(input.value)||0;
+          const suggestedOrder = Math.max(0, parNum - ohNum);
+          setC(v2, item, 'order', String(suggestedOrder));
+          const orderInput = allInputs.find(x=>x.dataset.vk===v2 && x.dataset.loc===loc && x.dataset.idx===idx && x.dataset.f==='order');
+          if(orderInput){
+            orderInput.value = suggestedOrder;
+            orderInput.classList.toggle('filled', true);
+          }
+        }
+      }
+
       refreshBadge(v2,loc);
       refreshFooter(v2);
 
@@ -2683,8 +2702,8 @@ function doPrint(vk, mode){
         });
         if(items.length===0) return; // skip empty locations entirely
       }
-      tableRows+=`<tr><td colspan="3" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">${loc}</td></tr>
-      <tr>
+      tableRows+=`<tr style="page-break-after:avoid;page-break-inside:avoid;"><td colspan="3" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">${loc}</td></tr>
+      <tr style="page-break-inside:avoid;">
         <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:55%;border-right:1px solid #8B0000;">Item</td>
         <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:25%;border-right:1px solid #8B0000;">#</td>
         <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:20%;">Order</td>
