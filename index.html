@@ -753,7 +753,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '8.2';
+const APP_VERSION = '8.3';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1346,14 +1346,26 @@ function showWmBreakdownScreen(mode){
     {loc:'Line', item:'Extra Longs', locked: isStanding},
     {loc:'Line', item:'Sourdough Torpedo', locked: isStanding},
   ];
-  const breakdownItems = [
-    {loc:'Freezer', item:'Hamburger Buns'},
-    {loc:'Freezer', item:'Filone'},
-    {loc:'Freezer', item:'4 Inch Rolls'},
-    {loc:'Freezer', item:'Bread Crumbs'},
-    {loc:'Line', item:'Hamburger Buns'},
-    {loc:'Line', item:'Filone'},
+
+  // Items that can come from multiple sources — combined into one running total each
+  const combinedItems = [
+    {name:'Hamburger Buns', freezerLoc:'Freezer', lineLoc:'Line'},
+    {name:'Filone', freezerLoc:'Freezer', lineLoc:'Line'},
+    {name:'4 Inch Rolls', freezerLoc:'Freezer', lineLoc:null},
+    {name:'Bread Crumbs', freezerLoc:'Freezer', lineLoc:null},
   ];
+
+  function wmCombinedBreakdown(ci){
+    const freezerItem = wmItem(ci.freezerLoc, ci.name);
+    const freezerNeeded = Number(getC(vk, freezerItem, 'order')) || 0;
+    const lineItem = ci.lineLoc ? wmItem(ci.lineLoc, ci.name) : null;
+    const lineNeeded = lineItem ? (Number(getC(vk, lineItem, 'order')) || 0) : 0;
+    const catering = Number(wmCatering[ci.name]) || 0;
+    const additionalKey = ci.freezerLoc+'|'+ci.name;
+    const additional = Number(wmAdditional[additionalKey]) || 0;
+    const total = freezerNeeded + lineNeeded + catering + additional;
+    return {freezerNeeded, lineNeeded, catering, additional, total};
+  }
 
   app.innerHTML = `
     <header class="H no-print">
@@ -1386,26 +1398,29 @@ function showWmBreakdownScreen(mode){
       </div>
 
       <div class="LocBlock" style="margin-top:14px;">
-        <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:.04em;">Freezer &amp; Line Breakdown</div>
-        <div style="display:grid;grid-template-columns:1fr 60px 60px 70px;gap:4px;padding:8px 16px 4px;font-size:9px;font-weight:700;color:#777;text-transform:uppercase;">
-          <div></div><div style="text-align:center;">On Hand</div><div style="text-align:center;">Needed</div><div style="text-align:center;">+ Extra</div>
-        </div>
-        ${breakdownItems.map(r=>{
-          const item = wmItem(r.loc, r.item);
-          const oh = getC(vk, item, 'oh');
-          const needed = getC(vk, item, 'order'); // set in step 1 as baseline
-          const additionalKey = r.loc+'|'+r.item;
-          const additional = wmAdditional[additionalKey] ?? '';
-          return `<div class="ProdRow" style="padding:10px 16px;">
-            <div style="display:grid;grid-template-columns:1fr 60px 60px 70px;gap:4px;align-items:center;width:100%;">
+        <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:.04em;">Running Total — Freezer + Line + Catering + Extra</div>
+        ${combinedItems.map(ci=>{
+          const b = wmCombinedBreakdown(ci);
+          const additionalKey = ci.freezerLoc+'|'+ci.name;
+          const parts = [];
+          if(b.freezerNeeded>0) parts.push(`Freezer: ${b.freezerNeeded}`);
+          if(b.lineNeeded>0) parts.push(`Line: ${b.lineNeeded}`);
+          if(b.catering>0) parts.push(`Catering: ${b.catering}`);
+          if(b.additional>0) parts.push(`Extra: ${b.additional}`);
+          const breakdown = parts.length ? parts.join(' · ') : 'Nothing needed';
+          return `<div class="ProdRow" style="padding:12px 16px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;width:100%;">
               <div>
-                <div class="ProdRow-name" style="font-size:13px;">${r.item}</div>
-                <div class="ProdRow-meta">${r.loc}</div>
+                <div class="ProdRow-name" style="font-size:14px;">${ci.name}</div>
+                <div class="ProdRow-meta" style="font-size:10px;">${breakdown}</div>
               </div>
-              <div style="text-align:center;font-weight:700;">${oh}</div>
-              <div style="text-align:center;font-weight:700;color:#1B6B3A;">${needed}</div>
-              <input class="SI" style="width:60px;height:36px;font-size:13px;" type="number" min="0" step="any" inputmode="decimal"
-                data-wmadditional="${additionalKey}" value="${additional}" placeholder="0">
+              <div style="display:flex;align-items:center;gap:10px;">
+                <div class="IG"><label>+ Extra</label>
+                  <input class="SI" style="width:56px;height:36px;font-size:13px;" type="number" min="0" step="any" inputmode="decimal"
+                    data-wmadditional="${additionalKey}" value="${wmAdditional[additionalKey] ?? ''}" placeholder="0">
+                </div>
+                <div style="font-weight:700;font-size:18px;color:#C8102E;min-width:32px;text-align:right;" id="wmTotal-${ci.name.replace(/\s+/g,'')}">${b.total}</div>
+              </div>
             </div>
           </div>`;
         }).join('')}
@@ -1422,17 +1437,34 @@ function showWmBreakdownScreen(mode){
     };
   });
   document.querySelectorAll('[data-wmadditional]').forEach(inp=>{
-    inp.oninput = ()=>{ wmAdditional[inp.dataset.wmadditional] = inp.value; };
+    inp.oninput = ()=>{
+      wmAdditional[inp.dataset.wmadditional] = inp.value;
+      const [loc,name] = inp.dataset.wmadditional.split('|');
+      const ci = combinedItems.find(c=>c.name===name);
+      const b = wmCombinedBreakdown(ci);
+      const totalEl = document.getElementById('wmTotal-'+name.replace(/\s+/g,''));
+      if(totalEl) totalEl.textContent = b.total;
+      const metaEl = inp.closest('.ProdRow').querySelector('.ProdRow-meta');
+      if(metaEl){
+        const parts = [];
+        if(b.freezerNeeded>0) parts.push(`Freezer: ${b.freezerNeeded}`);
+        if(b.lineNeeded>0) parts.push(`Line: ${b.lineNeeded}`);
+        if(b.catering>0) parts.push(`Catering: ${b.catering}`);
+        if(b.additional>0) parts.push(`Extra: ${b.additional}`);
+        metaEl.textContent = parts.length ? parts.join(' · ') : 'Nothing needed';
+      }
+    };
   });
 
   document.getElementById('bWmBreakdownDone').onclick = ()=>{
-    // Fold Needed + Additional into the final order for the breakdown items
-    breakdownItems.forEach(r=>{
-      const item = wmItem(r.loc, r.item);
-      const needed = Number(getC(vk, item, 'order')) || 0;
-      const additionalKey = r.loc+'|'+r.item;
+    combinedItems.forEach(ci=>{
+      const additionalKey = ci.freezerLoc+'|'+ci.name;
       const additional = Number(wmAdditional[additionalKey]) || 0;
-      setC(vk, item, 'order', String(needed + additional));
+      if(additional>0){
+        const freezerItem = wmItem(ci.freezerLoc, ci.name);
+        const current = Number(getC(vk, freezerItem, 'order')) || 0;
+        setC(vk, freezerItem, 'order', String(current + additional));
+      }
     });
     wmFinishBreadOrder();
   };
@@ -1441,11 +1473,32 @@ function showWmBreakdownScreen(mode){
 // ─── STEP 4: Review & Print ───────────────────────────────────────────────────
 function showWmReviewScreen(){
   const vk = 'bread';
-  const items = VENDORS.bread.items;
-  const orderedItems = items.filter(item => {
-    const or = getC(vk, item, 'order');
-    return or !== '' && or !== '0';
-  });
+
+  const standingNames = ['Extra Longs','Sourdough Torpedo'];
+  const combinedNames = [
+    {name:'Hamburger Buns', freezerLoc:'Freezer', lineLoc:'Line'},
+    {name:'Filone', freezerLoc:'Freezer', lineLoc:'Line'},
+    {name:'4 Inch Rolls', freezerLoc:'Freezer', lineLoc:null},
+    {name:'Bread Crumbs', freezerLoc:'Freezer', lineLoc:null},
+  ];
+
+  const standingRows = standingNames.map(name=>{
+    const item = wmItem('Line', name);
+    const qty = Number(getC(vk, item, 'order')) || 0;
+    return {name, qty};
+  }).filter(r=>r.qty>0);
+
+  const extraRows = combinedNames.map(ci=>{
+    const freezerItem = wmItem(ci.freezerLoc, ci.name);
+    const freezerQty = Number(getC(vk, freezerItem, 'order')) || 0;
+    const lineItem = ci.lineLoc ? wmItem(ci.lineLoc, ci.name) : null;
+    const lineQty = lineItem ? (Number(getC(vk, lineItem, 'order')) || 0) : 0;
+    const total = freezerQty + lineQty;
+    const parts = [];
+    if(freezerQty>0) parts.push(`Freezer: ${freezerQty}`);
+    if(lineQty>0) parts.push(`Line: ${lineQty}`);
+    return {name:ci.name, total, breakdown: parts.join(' · ')};
+  }).filter(r=>r.total>0);
 
   app.innerHTML = `
     <header class="H no-print">
@@ -1456,15 +1509,27 @@ function showWmReviewScreen(){
       <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Final Order</div>
       <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Order Summary</div>
       <div style="font-size:13px;color:#777;margin-bottom:18px;">Order Date: ${currentDate} · Delivery Date: ${deliveryDate} · Counted by: ${sessionUser}</div>
+
       <div class="LocBlock">
-        ${orderedItems.length===0 ? `<div style="padding:16px;color:#777;">No items to order.</div>` :
-          orderedItems.map(item=>`
+        <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#1B6B3A;text-transform:uppercase;letter-spacing:.04em;">Standing Order</div>
+        ${standingRows.length===0 ? `<div style="padding:12px 16px;color:#777;font-size:13px;">None</div>` :
+          standingRows.map(r=>`
+            <div class="ProdRow">
+              <div class="ProdRow-info"><div class="ProdRow-name">${r.name}</div></div>
+              <div style="font-weight:700;font-size:16px;color:#C8102E;">×${r.qty}</div>
+            </div>`).join('')}
+      </div>
+
+      <div class="LocBlock" style="margin-top:14px;">
+        <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:.04em;">Extras</div>
+        ${extraRows.length===0 ? `<div style="padding:12px 16px;color:#777;font-size:13px;">None</div>` :
+          extraRows.map(r=>`
             <div class="ProdRow">
               <div class="ProdRow-info">
-                <div class="ProdRow-name">${item.item}</div>
-                <div class="ProdRow-meta">${item.loc}</div>
+                <div class="ProdRow-name">${r.name}</div>
+                <div class="ProdRow-meta">${r.breakdown}</div>
               </div>
-              <div style="font-weight:700;font-size:16px;color:#C8102E;">×${getC(vk,item,'order')}</div>
+              <div style="font-weight:700;font-size:16px;color:#C8102E;">×${r.total}</div>
             </div>`).join('')}
       </div>
     </div>
@@ -1487,7 +1552,7 @@ async function wmFinishBreadOrder(){
 
   // Fold catering quantities into the running total, same way +Extra does — added on top, never replacing.
   const WM_CATERING_ITEM_LOCS = {
-    'Extra Longs':'Line', 'Sourdough Torpedo':'Line', 'Hamburger Buns':'Line', 'Filone':'Line', '4 Inch Rolls':'Freezer'
+    'Extra Longs':'Line', 'Sourdough Torpedo':'Line', 'Hamburger Buns':'Freezer', 'Filone':'Freezer', '4 Inch Rolls':'Freezer'
   };
   WM_CATERING_ITEMS.forEach(name=>{
     const cateringQty = Number(wmCatering[name]) || 0;
