@@ -98,7 +98,9 @@
       *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
       @page{margin:0.5in;size:letter portrait;}
       body > *{display:none!important;}
-      #print-area{display:block!important;}
+      #print-area{display:block!important;width:100%!important;height:auto!important;overflow:visible!important;position:static!important;}
+      html, body{height:auto!important;overflow:visible!important;}
+      #print-area table{width:100%!important;border-collapse:collapse!important;}
       #print-area table{page-break-inside:auto;}
       #print-area tr{page-break-inside:avoid;page-break-after:auto;}
       #print-area thead{display:table-header-group;}
@@ -439,7 +441,6 @@ const DATA = {
     {loc:"Line",item:"Sourdough Torpedo",num:"—",par:"—"},
     {loc:"Line",item:"Hamburger Buns",num:"—",par:"—"},
     {loc:"Line",item:"Filone",num:"—",par:"—"},
-    {loc:"Line",item:"4 Inch Rolls",num:"—",par:"—"},
   ]}
 },
   darien: {
@@ -752,7 +753,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '8.1';
+const APP_VERSION = '8.2';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1228,14 +1229,80 @@ function showWmCountScreen(){
       showModal('⚠ Bread Crumbs Low',
         `On Hand is <strong>${bcOnHand}</strong> — below the 0.25 threshold. Bread Crumbs is only used for two specific items, so this is your reminder to check if you're making them soon.<br><br>Add 1 (25 lb bag) to today's order?`,
         [
-          {l:'No', c:'B-outline', fn:()=>{ closeModal(); setC(vk, bcItem, 'order', String(Math.max(0, WM_BREAD_CRUMBS_PAR - bcOnHand))); showWmStandingChoiceScreen(); }},
-          {l:'Yes, Add 1', c:'B-red', fn:()=>{ closeModal(); setC(vk, bcItem, 'order', String(Math.max(1, WM_BREAD_CRUMBS_PAR - bcOnHand))); showWmStandingChoiceScreen(); }},
+          {l:'No', c:'B-outline', fn:()=>{ closeModal(); setC(vk, bcItem, 'order', String(Math.max(0, WM_BREAD_CRUMBS_PAR - bcOnHand))); showWmCateringScreen(); }},
+          {l:'Yes, Add 1', c:'B-red', fn:()=>{ closeModal(); setC(vk, bcItem, 'order', String(Math.max(1, WM_BREAD_CRUMBS_PAR - bcOnHand))); showWmCateringScreen(); }},
         ]
       );
     } else {
-      showWmStandingChoiceScreen();
+      showWmCateringScreen();
     }
   };
+}
+
+// ─── STEP 1b: Catering — every time, right after the combined count screen ───
+const WM_CATERING_ITEMS = ['Extra Longs','Sourdough Torpedo','Hamburger Buns','Filone','4 Inch Rolls'];
+let wmCatering = {}; // { item: qty } — transient, folded into order like +Extra
+
+function showWmCateringScreen(){
+  const vk = 'bread';
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Any Catering?</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Do you have any caterings?</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">If yes, enter how much of each bread type is needed. This gets added to today's order.</div>
+      <div class="LocBlock" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+        <button class="B B-outline B-lg" style="width:100%;" id="bWmCateringNo">No Catering</button>
+        <button class="B B-red B-lg" style="width:100%;" id="bWmCateringYes">Yes — Enter Catering</button>
+      </div>
+    </div>`;
+
+  document.getElementById('bWmCateringNo').onclick = ()=>{
+    wmCatering = {};
+    showWmStandingChoiceScreen();
+  };
+  document.getElementById('bWmCateringYes').onclick = ()=>showWmCateringEntryScreen();
+}
+
+function showWmCateringEntryScreen(){
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Catering Quantities</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">How much is needed?</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Enter how much of each item the catering needs. Leave blank for anything not needed.</div>
+      <div class="LocBlock">
+        ${WM_CATERING_ITEMS.map(name=>{
+          const val = wmCatering[name] ?? '';
+          return `<div class="ProdRow">
+            <div class="ProdRow-info">
+              <div class="ProdRow-name">${name}</div>
+            </div>
+            <div class="DualInput">
+              <div class="IG"><label>Qty</label>
+                <input class="SI${val!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
+                  data-wmcatering="${name}" value="${val}" placeholder="0">
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="Footer no-print">
+      <button class="B B-red B-lg" style="width:100%;" id="bWmCateringDone">Continue →</button>
+    </div>`;
+
+  document.querySelectorAll('[data-wmcatering]').forEach(inp=>{
+    inp.oninput = ()=>{ wmCatering[inp.dataset.wmcatering] = inp.value; };
+  });
+
+  document.getElementById('bWmCateringDone').onclick = ()=>showWmStandingChoiceScreen();
 }
 
 // ─── STEP 2: Standing Order vs Additional ─────────────────────────────────────
@@ -1417,7 +1484,22 @@ async function wmFinishBreadOrder(){
   const vk = 'bread';
   activeVendor = vk;
   if(!openLocs[vk]) openLocs[vk]=getLocs(vk)[0];
+
+  // Fold catering quantities into the running total, same way +Extra does — added on top, never replacing.
+  const WM_CATERING_ITEM_LOCS = {
+    'Extra Longs':'Line', 'Sourdough Torpedo':'Line', 'Hamburger Buns':'Line', 'Filone':'Line', '4 Inch Rolls':'Freezer'
+  };
+  WM_CATERING_ITEMS.forEach(name=>{
+    const cateringQty = Number(wmCatering[name]) || 0;
+    if(cateringQty>0){
+      const item = wmItem(WM_CATERING_ITEM_LOCS[name], name);
+      const current = Number(getC(vk, item, 'order')) || 0;
+      setC(vk, item, 'order', String(current + cateringQty));
+    }
+  });
+
   wmAdditional = {}; // reset for next session
+  wmCatering = {}; // reset for next session
 
   const s = sess[vk];
   if(s){
