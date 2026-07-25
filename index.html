@@ -753,7 +753,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '8.3';
+const APP_VERSION = '8.4';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -953,7 +953,11 @@ function showLogin(){
 
       if(activeVendor==='bread'){
         if(currentLoc==='westmont'){
-          if(completed['bread']){
+          const today3 = new Date();
+          if(today3.getDay()===6){
+            reviewMode=false;
+            enterBread();
+          } else if(completed['bread']){
             showModal('Order Already Completed',
               'This order was marked complete. What would you like to do?',
               [
@@ -1108,12 +1112,38 @@ function wmItem(loc, name){ return VENDORS.bread.items.find(i=>i.loc===loc && i.
 let wmAdditional = {}; // { "loc|item": "extra qty" } — transient, folded into order on Continue
 
 function enterBreadWestmont(){
-  activeVendor = 'bread';
-  if(!completed['bread']){
-    counts['bread'] = {};
+  const today = new Date();
+  const dow = today.getDay(); // 0=Sun..6=Sat
+
+  if(dow===6){
+    const sunDone = !!completed['bread_sunday'];
+    const monDone = !!completed['bread_monday'];
+    showModal('Saturday — Two Bread Orders',
+      'Saturday requires two separate Bread orders: one for Sunday delivery and one for Monday delivery. Both must be completed.',
+      [
+        {l:(sunDone?'✓ ':'')+'Sunday Delivery',c:sunDone?'B-outline':'B-red',fn:()=>{ closeModal(); wmStartSession('bread_sunday'); }},
+        {l:(monDone?'✓ ':'')+'Monday Delivery',c:monDone?'B-outline':'B-red',fn:()=>{ closeModal(); wmStartSession('bread_monday'); }}
+      ]
+    );
+  } else {
+    wmStartSession('bread');
+  }
+}
+
+function wmStartSession(vk){
+  activeVendor = vk;
+  ensureBreadAliasState(vk);
+  if(!completed[vk]){
+    counts[vk] = {};
     saveState();
   }
-  showWmCountScreen();
+  const s = sess[vk];
+  if(s){
+    sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
+    showWmCountScreen();
+  } else {
+    showVerify(vk);
+  }
 }
 
 // Fixed pars
@@ -1131,7 +1161,7 @@ const WM_ALL_COUNT_ITEMS = [
 
 // ─── STEP 1: One combined counting screen (Freezer + Breadcrumb + Line) ───────
 function showWmCountScreen(){
-  const vk = 'bread';
+  const vk = activeVendor;
   const today2 = new Date();
   const dow2 = today2.getDay();
   const lineDayPar = wmLineDayPar(dow2);
@@ -1244,7 +1274,7 @@ const WM_CATERING_ITEMS = ['Extra Longs','Sourdough Torpedo','Hamburger Buns','F
 let wmCatering = {}; // { item: qty } — transient, folded into order like +Extra
 
 function showWmCateringScreen(){
-  const vk = 'bread';
+  const vk = activeVendor;
   app.innerHTML = `
     <header class="H no-print">
       <div class="H-logo">Bread</div>
@@ -1307,7 +1337,7 @@ function showWmCateringEntryScreen(){
 
 // ─── STEP 2: Standing Order vs Additional ─────────────────────────────────────
 function showWmStandingChoiceScreen(){
-  const vk = 'bread';
+  const vk = activeVendor;
   const today2 = new Date();
   const dow2 = today2.getDay();
   app.innerHTML = `
@@ -1339,7 +1369,7 @@ function showWmStandingChoiceScreen(){
 
 // ─── STEP 3: Three-column breakdown (On Hand / Needed / Additional) ──────────
 function showWmBreakdownScreen(mode){
-  const vk = 'bread';
+  const vk = activeVendor;
   const isStanding = mode==='standing';
 
   const extraItems = [
@@ -1472,7 +1502,7 @@ function showWmBreakdownScreen(mode){
 
 // ─── STEP 4: Review & Print ───────────────────────────────────────────────────
 function showWmReviewScreen(){
-  const vk = 'bread';
+  const vk = activeVendor;
 
   const standingNames = ['Extra Longs','Sourdough Torpedo'];
   const combinedNames = [
@@ -1546,7 +1576,7 @@ function showWmReviewScreen(){
 }
 
 async function wmFinishBreadOrder(){
-  const vk = 'bread';
+  const vk = activeVendor;
   activeVendor = vk;
   if(!openLocs[vk]) openLocs[vk]=getLocs(vk)[0];
 
@@ -1566,14 +1596,7 @@ async function wmFinishBreadOrder(){
   wmAdditional = {}; // reset for next session
   wmCatering = {}; // reset for next session
 
-  const s = sess[vk];
-  if(s){
-    sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
-    showWmReviewScreen();
-  } else {
-    pendingBreadReview = true;
-    showVerify(vk);
-  }
+  showWmReviewScreen();
 }
 
 let pendingBreadReview = false;
@@ -2408,6 +2431,8 @@ function showDateEntry(vk, user){
     if(pendingBreadReview){
       pendingBreadReview = false;
       showWmReviewScreen();
+    } else if(vk.startsWith('bread')){
+      showWmCountScreen();
     } else {
       showCount();
     }
@@ -2672,17 +2697,20 @@ function showCount(){
       setC(v2,item,f,input.value);
       input.classList.toggle('filled',input.value!=='');
 
-      // Auto-populate Order from Par − On Hand, Westmont only. Still fully editable after.
-      if(f==='oh' && currentLoc==='westmont' && input.value!==''){
+      // Auto-populate Order for Greco/GFS/Marlin at Westmont only.
+      // Rule: if On Hand is at or below 25% of Par, order exactly 1 whole unit — never a fractional difference.
+      // Above 25% of Par, don't auto-populate anything.
+      if(f==='oh' && currentLoc==='westmont' && ['greco','gfs','marlin'].includes(v2) && input.value!==''){
         const parNum = parseFloat(item.par);
-        if(!isNaN(parNum)){
+        if(!isNaN(parNum) && parNum>0){
           const ohNum = parseFloat(input.value)||0;
-          const suggestedOrder = Math.max(0, parNum - ohNum);
+          const ratio = ohNum / parNum;
+          const suggestedOrder = ratio <= 0.25 ? 1 : 0;
           setC(v2, item, 'order', String(suggestedOrder));
           const orderInput = allInputs.find(x=>x.dataset.vk===v2 && x.dataset.loc===loc && x.dataset.idx===idx && x.dataset.f==='order');
           if(orderInput){
             orderInput.value = suggestedOrder;
-            orderInput.classList.toggle('filled', true);
+            orderInput.classList.toggle('filled', suggestedOrder>0);
           }
         }
       }
