@@ -753,7 +753,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '8.4';
+const APP_VERSION = '8.5';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2698,14 +2698,14 @@ function showCount(){
       input.classList.toggle('filled',input.value!=='');
 
       // Auto-populate Order for Greco/GFS/Marlin at Westmont only.
-      // Rule: if On Hand is at or below 25% of Par, order exactly 1 whole unit — never a fractional difference.
+      // Rule: if On Hand is at or below 25% of Par, order enough to bring it back up to Par (rounded to a whole unit).
       // Above 25% of Par, don't auto-populate anything.
       if(f==='oh' && currentLoc==='westmont' && ['greco','gfs','marlin'].includes(v2) && input.value!==''){
         const parNum = parseFloat(item.par);
         if(!isNaN(parNum) && parNum>0){
           const ohNum = parseFloat(input.value)||0;
           const ratio = ohNum / parNum;
-          const suggestedOrder = ratio <= 0.25 ? 1 : 0;
+          const suggestedOrder = ratio <= 0.25 ? Math.round(parNum - ohNum) : 0;
           setC(v2, item, 'order', String(suggestedOrder));
           const orderInput = allInputs.find(x=>x.dataset.vk===v2 && x.dataset.loc===loc && x.dataset.idx===idx && x.dataset.f==='order');
           if(orderInput){
