@@ -754,7 +754,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '8.8';
+const APP_VERSION = '8.9';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2730,12 +2730,12 @@ function showCount(){
         let suggestedOrder = null;
         if(WM_CASES_ONLY_ITEMS.has(item.item)){
           const ohCases = parseFloat(input.value)||0;
-          suggestedOrder = ohCases < 0.5 ? 1 : 0;
+          suggestedOrder = ohCases <= 0.5 ? 1 : 0;
         } else if(WM_CASE_RULE_ITEMS[item.item]!==undefined){
           const unitsPerCase = WM_CASE_RULE_ITEMS[item.item];
           const ohNum = parseFloat(input.value)||0;
           const ratio = ohNum / unitsPerCase;
-          suggestedOrder = ratio < 0.5 ? 1 : 0;
+          suggestedOrder = ratio <= 0.5 ? 1 : 0;
         }
 
         if(suggestedOrder!==null){
@@ -2761,12 +2761,12 @@ function showCount(){
         }
       }
 
-      // GFS: 3 confirmed case-rule items (units-based, below 50% of units-per-case -> order 1 case)
-      const WM_GFS_CASE_ITEMS = { 'Chx - 4oz Precooked':2, 'Chx - Tenders':2, 'Fries':6 };
-      if(f==='oh' && currentLoc==='westmont' && v2==='gfs' && input.value!=='' && WM_GFS_CASE_ITEMS[item.item]!==undefined){
-        const unitsPerCase = WM_GFS_CASE_ITEMS[item.item];
-        const ohNum = parseFloat(input.value)||0;
-        const suggestedOrder = (ohNum/unitsPerCase) < 0.5 ? 1 : 0;
+      // GFS: case-based items — Par is already stored in cases, check directly against 50% of Par
+      const WM_GFS_CASES_ONLY_ITEMS = new Set(['Chx - 4oz Precooked', 'Chx - Tenders', 'Fries']);
+      if(f==='oh' && currentLoc==='westmont' && v2==='gfs' && input.value!=='' && WM_GFS_CASES_ONLY_ITEMS.has(item.item)){
+        const parNum = parseFloat(item.par);
+        const ohCases = parseFloat(input.value)||0;
+        const suggestedOrder = (!isNaN(parNum) && parNum>0 && (ohCases/parNum) <= 0.5) ? 1 : 0;
         setC(v2, item, 'order', String(suggestedOrder));
         const orderInput = allInputs.find(x=>x.dataset.vk===v2 && x.dataset.loc===loc && x.dataset.idx===idx && x.dataset.f==='order');
         if(orderInput){
@@ -2790,7 +2790,7 @@ function showCount(){
       // Auto-populate Order for GFS/Marlin at Westmont only — original rule, untouched.
       // Rule: if On Hand is at or below 25% of Par, order enough to bring it back up to Par (rounded to a whole unit).
       // Skips the 3 GFS items already handled above by the case rule.
-      if(f==='oh' && currentLoc==='westmont' && ['gfs','marlin'].includes(v2) && input.value!=='' && WM_GFS_CASE_ITEMS[item.item]===undefined){
+      if(f==='oh' && currentLoc==='westmont' && ['gfs','marlin'].includes(v2) && input.value!=='' && !WM_GFS_CASES_ONLY_ITEMS.has(item.item)){
         const parNum = parseFloat(item.par);
         if(!isNaN(parNum) && parNum>0){
           const ohNum = parseFloat(input.value)||0;
