@@ -753,7 +753,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '8.6';
+const APP_VERSION = '8.7';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2701,10 +2701,10 @@ function showCount(){
       // Group A: counted by the UNIT, ordered by the case. Below 50% of units-per-case -> order 1 case.
       const WM_CASE_RULE_ITEMS = {
         'Spring Mix':3, 'App - Fried Mush':4, 'App - Fried Zucc':4,
-        'App - Moz Stx':4, 'App - Skins':4,
-        'Cheese - Gorgonzola':4, 'Cheese - Grated Parm':4, 'Cheese - Ricotta Grande':4,
+        'App - Moz Stx':4, 'App - Skins':4, 'App - Onion Rings':8,
+        'Cheese - Gorgonzola':4, 'Cheese - Grated Parm':4, 'Cheese - Ricotta Grande':4, 'Cheese - Moz Logs':8,
         'Cheese - Romano':4, 'Cheese - Shaved Parm':4, 'Cheese - Shredded Cheddar':6, 'Cheese - Sliced American':6,
-        'Chx - Hearts':10, 'Sausage - Link':10, 'Veg - Celery':3, 'Veg - Green Onion':4,
+        'Veg - Celery':3, 'Veg - Green Onion':4,
         'Can - Black Olives':6, 'Dr - Blue Cheese':6, 'Can - Pineapple Bits':6,
         'Can - Sliced Jalapeno':6, 'Oil - Olive':6, 'Breading - Chx Fry':6,
         'Breading - Fish Fry':6, 'Gloves':10,
@@ -2712,7 +2712,7 @@ function showCount(){
         'Folder - 07"':50, 'Folder - 12"':50, 'Folder - 14"':50, 'Folder - 16"':50, 'Folder - 18"':50,
         'GF Pizza':24, 'Pepperoni':2, 'Dough - High Gluten':2, 'Bacon Bites':2, 'Pasta - Gnochi':2,
         'Cheese Ravioli':2, 'Pasta - Elbow':2, 'Pasta - Fettuccini':2, 'Pasta - Penne':2, 'Pasta - Spaghetti':2,
-        'Cod':1, 'Shrimp - Coconut':4, 'Shrimp - Jumbo':4, '14" Dessert Lid':40, '14" Dessert Tray':20,
+        'Shrimp - Coconut':4, 'Shrimp - Jumbo':4, '14" Dessert Lid':40, '14" Dessert Tray':20,
         'Square Cont (18oz)':4, 'Square Lid (18oz)':4, 'Fruit - Lemons':95, 'Fruit - Limes':30, 'Fruit - Oranges':10,
         'Garlic Spread':6, 'Sour Cream':9, 'Green Scrub Pad':10, 'Metal Scrub Pad':12, 'Mopheads':4,
         'Dessert - Ch Cake':2, 'Dessert - Tiramisu':16,
@@ -2720,8 +2720,9 @@ function showCount(){
 
       // Group B: On Hand is entered directly IN CASES (par already stored in cases). Below 0.5 case -> order 1 case.
       const WM_CASES_ONLY_ITEMS = new Set([
-        'App - Chx Finger', 'App - Fries', 'App - Onion Rings', 'Ribs',
-        'Cheese - Moz Logs', 'Eggs - 15 dz', 'Sausage - Pizza', 'Foam - 9x9 Containers',
+        'App - Chx Finger', 'App - Fries', 'Ribs',
+        'Eggs - 15 dz', 'Sausage - Pizza', 'Foam - 9x9 Containers',
+        'Cod', 'Chx - Hearts', 'Sausage - Link', 'Tomato Puree', 'Tomato Magic',
       ]);
 
       if(f==='oh' && currentLoc==='westmont' && v2==='greco' && input.value!==''){
