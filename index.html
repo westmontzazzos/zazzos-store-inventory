@@ -754,7 +754,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '8.9';
+const APP_VERSION = '9.0';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2707,10 +2707,8 @@ function showCount(){
         'Cheese - Romano':4, 'Cheese - Shaved Parm':4, 'Cheese - Shredded Cheddar':6, 'Cheese - Sliced American':6,
         'Veg - Celery':3, 'Veg - Green Onion':4,
         'Can - Black Olives':6, 'Dr - Blue Cheese':6, 'Can - Pineapple Bits':6,
-        'Can - Sliced Jalapeno':6, 'Oil - Olive':6, 'Breading - Chx Fry':6,
+        'Can - Sliced Jalapeno':6, 'Oil - Olive':6, 'Breading - Chx Fry':6, 'Can - Cheese Award':6,
         'Breading - Fish Fry':6, 'Gloves':10,
-        'Circle - 10"':100, 'Circle - 12"':100, 'Circle - 14"':100, 'Circle - 16"':100, 'Circle - 18"':50,
-        'Folder - 07"':50, 'Folder - 12"':50, 'Folder - 14"':50, 'Folder - 16"':50, 'Folder - 18"':50,
         'GF Pizza':24, 'Pepperoni':2, 'Dough - High Gluten':2, 'Bacon Bites':2, 'Pasta - Gnochi':2,
         'Cheese Ravioli':2, 'Pasta - Elbow':2, 'Pasta - Fettuccini':2, 'Pasta - Penne':2, 'Pasta - Spaghetti':2,
         'Shrimp - Coconut':4, 'Shrimp - Jumbo':4, '14" Dessert Lid':40, '14" Dessert Tray':20,
@@ -2719,23 +2717,164 @@ function showCount(){
         'Dessert - Ch Cake':2, 'Dessert - Tiramisu':16,
       };
 
-      // Group B: On Hand is entered directly IN CASES (par already stored in cases). Below 0.5 case -> order 1 case.
+      // Group B: On Hand is entered directly IN CASES (par already stored in cases). At/below 0.5 case -> order 1 case.
       const WM_CASES_ONLY_ITEMS = new Set([
         'App - Chx Finger', 'App - Fries', 'Ribs',
         'Eggs - 15 dz', 'Sausage - Pizza', 'Foam - 9x9 Containers',
-        'Cod', 'Chx - Hearts', 'Sausage - Link', 'Tomato Puree', 'Tomato Magic',
+        'Cod', 'Tomato Puree', 'Tomato Magic',
+      ]);
+
+      // Group C: no case conversion at all — just compare On Hand to Par directly.
+      // At/below 50% of Par -> order enough to bring it back up to Par (Par minus On Hand).
+      const WM_DIRECT_PAR_ITEMS = new Set([
+        'Butter Milk', 'Cheese - Lugano',
+        'Circle - 10"', 'Circle - 12"', 'Circle - 14"', 'Circle - 16"', 'Circle - 18"',
+        'Folder - 07"', 'Folder - 12"', 'Folder - 14"', 'Folder - 16"', 'Folder - 18"',
+      ]);
+
+      // Universal fallback for every other Greco item not specifically dictated:
+      // compare On Hand directly to Par. At/below 50% -> order enough to reach Par.
+      // Items with a fake/zero Par (like Chx - Hearts, Sausage - Link) are safely skipped
+      // because the parNum>0 check below excludes them automatically.
+      const WM_UNIVERSAL_FALLBACK_ITEMS = new Set([
+        'Water Bottles',
+        'App - Bosco',
+        'App - Pretzel',
+        'Ice Cream',
+        'Butter',
+        'Cheese - Cucina',
+        'Chx - Hearts',
+        'Hamburger',
+        'Herb - Fresh Basil',
+        'Herb - Fresh Parsley',
+        'Sausage - Link',
+        'Spear Pickles',
+        'Veg - Green Pepper',
+        'Veg - Jumbo Carrots',
+        'Veg - Peeled Garlic',
+        'Veg - Red Pepper',
+        'Veg - Spinach',
+        'Veg - Tomato - Roma',
+        'Veg - Yellow Squash',
+        'Veg - Zucchini',
+        'Onion - Red',
+        'Onion - Spanish',
+        'Racks',
+        'Paper Plates',
+        '5lb Basil',
+        '5lb Oregano',
+        '9x9 Foam',
+        'Base - Beef',
+        'Base - Chx',
+        'BBQ - 5gal Open Pit',
+        'Cond - Black Pepper',
+        'Cond - Garlic Powder',
+        'Cond - Italian Seasoning',
+        'Cond - Lemon Pepper',
+        'Cond - Red Pepper Flakes',
+        'Cond - Rosemary',
+        'Cooking Wine',
+        'Dr - Balsamic',
+        'Dr - Cajun Chef',
+        'Dr - Caesar',
+        'Dr - Chipotle Mayo',
+        'Dr - Cocktail',
+        'Dr - Hot Giardinara',
+        'Dr - Mayo',
+        'Dr - Red Wine Vin',
+        'Dr - Tartar Sauce',
+        'Dr - Franks',
+        'Hair Nets',
+        'Liner - Sheet (16x24)',
+        'Seasoning Salt Lawry\'s',
+        'Separating Italian',
+        'Sheets - Foil 6ct',
+        'Sheets - Sand Wrap',
+        'Sheets - Wax Paper',
+        'Dough - King Wheat',
+        'Dough - Salt',
+        'Dough - Sugar',
+        'Dough - Yeast',
+        'Oil - Corn',
+        'Laz Sheets',
+        'Pasta - Rav',
+        'Canliner - Black',
+        'Canliner - Clear',
+        'Spic n Span',
+        'Liner - Pan Full',
+        'Liner - Pan Half',
+        'Liner - Pan Third',
+        'Pan - Full',
+        'Pan - Half',
+        'Pan - XL',
+        'Rice',
+        'Bals Glaze',
+        'Bamboo Skewer',
+        'Brown Bags - Lg',
+        'Brown Bags - Med',
+        'Catering Boxes',
+        'Catering Ladles',
+        'Catering Spoons',
+        'Catering Tongs',
+        'Fry Bags',
+        'Ind Packet - BBQ',
+        'Ind Packet - Ketchup',
+        'Ind Packet - Mayo',
+        'Ind Packet - Mustard',
+        'Lid - Half',
+        'Lid - XL',
+        'Potatoes',
+        'Milk (2%)',
+        'Powder Sugar',
+        'Wrapped Straws',
+        'Choc Syrup - Hershey\'s',
+        'Whip Cream - Aerosol',
+        'Packets - Parm',
+        'Packets - Red Pepper',
+        'Hot Giardinara Jars',
+        'Crayons',
+        'Bar Fruit - Cherries',
+        'Bar Fruit - Olives',
+        'Check Books'
       ]);
 
       if(f==='oh' && currentLoc==='westmont' && v2==='greco' && input.value!==''){
         let suggestedOrder = null;
-        if(WM_CASES_ONLY_ITEMS.has(item.item)){
+        if(WM_DIRECT_PAR_ITEMS.has(item.item)){
+          const parNum = parseFloat(item.par);
+          const ohNum = parseFloat(input.value)||0;
+          if(!isNaN(parNum) && parNum>0 && (ohNum/parNum) <= 0.5){
+            suggestedOrder = Math.round(parNum - ohNum);
+          } else {
+            suggestedOrder = 0;
+          }
+        } else if(WM_CASES_ONLY_ITEMS.has(item.item)){
+          const parNum = parseFloat(item.par);
           const ohCases = parseFloat(input.value)||0;
-          suggestedOrder = ohCases <= 0.5 ? 1 : 0;
+          if(!isNaN(parNum) && parNum>0 && (ohCases/parNum) <= 0.5){
+            suggestedOrder = Math.round(parNum - ohCases);
+          } else {
+            suggestedOrder = 0;
+          }
         } else if(WM_CASE_RULE_ITEMS[item.item]!==undefined){
           const unitsPerCase = WM_CASE_RULE_ITEMS[item.item];
           const ohNum = parseFloat(input.value)||0;
           const ratio = ohNum / unitsPerCase;
-          suggestedOrder = ratio <= 0.5 ? 1 : 0;
+          if(ratio <= 0.5){
+            const parNum = parseFloat(item.par);
+            suggestedOrder = (!isNaN(parNum) && parNum>0) ? Math.round((parNum - ohNum)/unitsPerCase) || 1 : 1;
+            if(suggestedOrder < 1) suggestedOrder = 1;
+          } else {
+            suggestedOrder = 0;
+          }
+        } else if(WM_UNIVERSAL_FALLBACK_ITEMS.has(item.item)){
+          const parNum = parseFloat(item.par);
+          const ohNum = parseFloat(input.value)||0;
+          if(!isNaN(parNum) && parNum>0 && (ohNum/parNum) <= 0.5){
+            suggestedOrder = Math.round(parNum - ohNum);
+          } else {
+            suggestedOrder = 0;
+          }
         }
 
         if(suggestedOrder!==null){
@@ -2744,9 +2883,10 @@ function showCount(){
         if(orderInput){
           orderInput.value = suggestedOrder;
           orderInput.classList.toggle('filled', suggestedOrder>0);
-          // Show a clear "case" label next to the field when it auto-fires, so there's no ambiguity with unit counts
+          // Show a clear "case" label only for items actually ordered by the case — not Group C (direct par items)
+          const isCaseOrdered = !WM_DIRECT_PAR_ITEMS.has(item.item);
           let caseTag = orderInput.parentElement.querySelector('.wmCaseTag');
-          if(suggestedOrder>0){
+          if(suggestedOrder>0 && isCaseOrdered){
             if(!caseTag){
               caseTag = document.createElement('div');
               caseTag.className = 'wmCaseTag';
