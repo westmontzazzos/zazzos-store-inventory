@@ -754,7 +754,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '9.0';
+const APP_VERSION = '9.1';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1103,6 +1103,23 @@ const WM_FREEZER_ITEMS = [
 ];
 const WM_BREAD_CRUMBS_PAR = 1;
 const WM_BREAD_CRUMBS_LOW_THRESHOLD = 0.25;
+const WM_CASE_RULE_ITEMS_TOP = {
+  'Spring Mix':3, 'App - Fried Mush':4, 'App - Fried Zucc':4,
+  'App - Moz Stx':4, 'App - Skins':4, 'App - Onion Rings':10,
+  'Cheese - Gorgonzola':4, 'Cheese - Grated Parm':4, 'Cheese - Ricotta Grande':4, 'Cheese - Moz Logs':8,
+  'Cheese - Romano':4, 'Cheese - Shaved Parm':4, 'Cheese - Shredded Cheddar':6, 'Cheese - Sliced American':6,
+  'Veg - Celery':3, 'Veg - Green Onion':4,
+  'Can - Black Olives':6, 'Dr - Blue Cheese':6, 'Can - Pineapple Bits':6,
+  'Can - Sliced Jalapeno':6, 'Oil - Olive':6, 'Breading - Chx Fry':6, 'Can - Cheese Award':6,
+  'Breading - Fish Fry':6, 'Gloves':10,
+  'GF Pizza':24, 'Pepperoni':2, 'Dough - High Gluten':2, 'Bacon Bites':2, 'Pasta - Gnochi':2,
+  'Cheese Ravioli':2, 'Pasta - Elbow':2, 'Pasta - Fettuccini':2, 'Pasta - Penne':2, 'Pasta - Spaghetti':2,
+  'Shrimp - Coconut':4, 'Shrimp - Jumbo':4, '14" Dessert Lid':40, '14" Dessert Tray':20,
+  'Square Cont (18oz)':4, 'Square Lid (18oz)':4, 'Fruit - Lemons':95, 'Fruit - Limes':30, 'Fruit - Oranges':10,
+  'Garlic Spread':6, 'Sour Cream':9, 'Green Scrub Pad':10, 'Metal Scrub Pad':12, 'Mopheads':4,
+  'Dessert - Ch Cake':2, 'Dessert - Tiramisu':16,
+};
+
 const WM_LINE_STANDING = {
   'Extra Longs':       {0:9, 1:6, 2:6, 3:7, 4:7, 5:11, 6:11},
   'Sourdough Torpedo':  {0:8, 1:6, 2:6, 3:8, 4:8, 5:10, 6:10},
@@ -2465,7 +2482,9 @@ function showCount(){
       const prevDone = !SEQ() || items.slice(0,idx).every(p=>getC(vk,p,'oh')!=='' && getC(vk,p,'order')!=='');
       const missingNum = item.num==='—' || item.num==='' || item.num==='WESTMONT';
       const displayPar = (vk.startsWith('bread') && item[breadParFieldFor(vk)]!==undefined) ? item[breadParFieldFor(vk)] : item.par;
-      const meta = (item.num!=='—'?'#'+item.num+' · ':'')+'PAR: '+displayPar;
+      const wmCaseHint = (currentLoc==='westmont' && vk==='greco' && WM_CASE_RULE_ITEMS_TOP[item.item]!==undefined)
+        ? ` · ${WM_CASE_RULE_ITEMS_TOP[item.item]} units = 1 case` : '';
+      const meta = (item.num!=='—'?'#'+item.num+' · ':'')+'PAR: '+displayPar+wmCaseHint;
       const nameStyle = missingNum ? 'background:#FFF59D;border-radius:3px;padding:0 3px;display:inline-block;' : '';
       return `<div class="ProdRow" data-name="${item.item.toLowerCase()}">
         <div class="ProdRow-info">
@@ -2700,22 +2719,6 @@ function showCount(){
 
       // Auto-populate Order for specific Westmont Greco items only.
       // Group A: counted by the UNIT, ordered by the case. Below 50% of units-per-case -> order 1 case.
-      const WM_CASE_RULE_ITEMS = {
-        'Spring Mix':3, 'App - Fried Mush':4, 'App - Fried Zucc':4,
-        'App - Moz Stx':4, 'App - Skins':4, 'App - Onion Rings':8,
-        'Cheese - Gorgonzola':4, 'Cheese - Grated Parm':4, 'Cheese - Ricotta Grande':4, 'Cheese - Moz Logs':8,
-        'Cheese - Romano':4, 'Cheese - Shaved Parm':4, 'Cheese - Shredded Cheddar':6, 'Cheese - Sliced American':6,
-        'Veg - Celery':3, 'Veg - Green Onion':4,
-        'Can - Black Olives':6, 'Dr - Blue Cheese':6, 'Can - Pineapple Bits':6,
-        'Can - Sliced Jalapeno':6, 'Oil - Olive':6, 'Breading - Chx Fry':6, 'Can - Cheese Award':6,
-        'Breading - Fish Fry':6, 'Gloves':10,
-        'GF Pizza':24, 'Pepperoni':2, 'Dough - High Gluten':2, 'Bacon Bites':2, 'Pasta - Gnochi':2,
-        'Cheese Ravioli':2, 'Pasta - Elbow':2, 'Pasta - Fettuccini':2, 'Pasta - Penne':2, 'Pasta - Spaghetti':2,
-        'Shrimp - Coconut':4, 'Shrimp - Jumbo':4, '14" Dessert Lid':40, '14" Dessert Tray':20,
-        'Square Cont (18oz)':4, 'Square Lid (18oz)':4, 'Fruit - Lemons':95, 'Fruit - Limes':30, 'Fruit - Oranges':10,
-        'Garlic Spread':6, 'Sour Cream':9, 'Green Scrub Pad':10, 'Metal Scrub Pad':12, 'Mopheads':4,
-        'Dessert - Ch Cake':2, 'Dessert - Tiramisu':16,
-      };
 
       // Group B: On Hand is entered directly IN CASES (par already stored in cases). At/below 0.5 case -> order 1 case.
       const WM_CASES_ONLY_ITEMS = new Set([
@@ -2856,8 +2859,8 @@ function showCount(){
           } else {
             suggestedOrder = 0;
           }
-        } else if(WM_CASE_RULE_ITEMS[item.item]!==undefined){
-          const unitsPerCase = WM_CASE_RULE_ITEMS[item.item];
+        } else if(WM_CASE_RULE_ITEMS_TOP[item.item]!==undefined){
+          const unitsPerCase = WM_CASE_RULE_ITEMS_TOP[item.item];
           const ohNum = parseFloat(input.value)||0;
           const ratio = ohNum / unitsPerCase;
           if(ratio <= 0.5){
