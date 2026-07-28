@@ -754,7 +754,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '9.2';
+const APP_VERSION = '9.3';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1115,7 +1115,7 @@ const WM_CASE_RULE_ITEMS_TOP = {
   'GF Pizza':24, 'Pepperoni':2, 'Dough - High Gluten':2, 'Bacon Bites':2, 'Pasta - Gnochi':2,
   'Cheese Ravioli':2, 'Pasta - Elbow':2, 'Pasta - Fettuccini':2, 'Pasta - Penne':2, 'Pasta - Spaghetti':2,
   'Shrimp - Coconut':4, 'Shrimp - Jumbo':4, '14" Dessert Lid':40, '14" Dessert Tray':20,
-  'Square Cont (18oz)':4, 'Square Lid (18oz)':4, 'Fruit - Lemons':95, 'Fruit - Limes':30, 'Fruit - Oranges':10,
+  'Square Cont (18oz)':4, 'Square Lid (18oz)':4,
   'Garlic Spread':6, 'Sour Cream':9, 'Green Scrub Pad':10, 'Metal Scrub Pad':12, 'Mopheads':4,
   'Dessert - Ch Cake':2, 'Dessert - Tiramisu':16,
 };
@@ -2743,6 +2743,9 @@ function showCount(){
       // because the parNum>0 check below excludes them automatically.
       const WM_UNIVERSAL_FALLBACK_ITEMS = new Set([
         'Water Bottles',
+        'Fruit - Lemons',
+        'Fruit - Limes',
+        'Fruit - Oranges',
         'App - Bosco',
         'App - Pretzel',
         'Ice Cream',
