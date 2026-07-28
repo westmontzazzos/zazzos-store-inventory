@@ -754,7 +754,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '9.1';
+const APP_VERSION = '9.2';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2724,15 +2724,17 @@ function showCount(){
       const WM_CASES_ONLY_ITEMS = new Set([
         'App - Chx Finger', 'App - Fries', 'Ribs',
         'Eggs - 15 dz', 'Sausage - Pizza', 'Foam - 9x9 Containers',
-        'Cod', 'Tomato Puree', 'Tomato Magic',
+        'Cod',
       ]);
+
+      // Group D: On Hand compared directly to Par, but ALWAYS orders exactly 1 case when triggered
+      // (never the arithmetic difference) — for items ordered strictly by the case.
+      const WM_ALWAYS_ONE_CASE_ITEMS = new Set(['Pan - Full', 'Pan - Half', 'Pan - XL']);
 
       // Group C: no case conversion at all — just compare On Hand to Par directly.
       // At/below 50% of Par -> order enough to bring it back up to Par (Par minus On Hand).
       const WM_DIRECT_PAR_ITEMS = new Set([
         'Butter Milk', 'Cheese - Lugano',
-        'Circle - 10"', 'Circle - 12"', 'Circle - 14"', 'Circle - 16"', 'Circle - 18"',
-        'Folder - 07"', 'Folder - 12"', 'Folder - 14"', 'Folder - 16"', 'Folder - 18"',
       ]);
 
       // Universal fallback for every other Greco item not specifically dictated:
@@ -2807,9 +2809,6 @@ function showCount(){
         'Liner - Pan Full',
         'Liner - Pan Half',
         'Liner - Pan Third',
-        'Pan - Full',
-        'Pan - Half',
-        'Pan - XL',
         'Rice',
         'Bals Glaze',
         'Bamboo Skewer',
@@ -2851,6 +2850,10 @@ function showCount(){
           } else {
             suggestedOrder = 0;
           }
+        } else if(WM_ALWAYS_ONE_CASE_ITEMS.has(item.item)){
+          const parNum = parseFloat(item.par);
+          const ohNum = parseFloat(input.value)||0;
+          suggestedOrder = (!isNaN(parNum) && parNum>0 && (ohNum/parNum) <= 0.5) ? 1 : 0;
         } else if(WM_CASES_ONLY_ITEMS.has(item.item)){
           const parNum = parseFloat(item.par);
           const ohCases = parseFloat(input.value)||0;
