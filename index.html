@@ -755,7 +755,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '9.6';
+const APP_VERSION = '9.7';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1117,7 +1117,7 @@ const WM_CASE_RULE_ITEMS_TOP = {
   'Breading - Fish Fry':6, 'Gloves':10,
   'GF Pizza':24, 'Pepperoni':2, 'Dough - High Gluten':2, 'Bacon Bites':2, 'Pasta - Gnochi':2,
   'Cheese Ravioli':2, 'Pasta - Elbow':2, 'Pasta - Fettuccini':2, 'Pasta - Penne':2, 'Pasta - Spaghetti':2,
-  'Shrimp - Coconut':4, 'Shrimp - Jumbo':4, '14" Dessert Lid':40, '14" Dessert Tray':20,
+  'Shrimp - Coconut':6, 'Shrimp - Jumbo':6, '14" Dessert Lid':40, '14" Dessert Tray':20,
   'Square Cont (18oz)':4, 'Square Lid (18oz)':4,
   'Garlic Spread':6, 'Sour Cream':9, 'Green Scrub Pad':10, 'Metal Scrub Pad':12, 'Mopheads':4, 'Dinner Napkins':10,
   'Dessert - Ch Cake':2, 'Dessert - Tiramisu':16,
@@ -2595,8 +2595,18 @@ function showCount(){
       const prevDone = !SEQ() || items.slice(0,idx).every(p=>getC(vk,p,'oh')!=='' && getC(vk,p,'order')!=='');
       const missingNum = item.num==='—' || item.num==='' || item.num==='WESTMONT';
       const displayPar = (vk.startsWith('bread') && item[breadParFieldFor(vk)]!==undefined) ? item[breadParFieldFor(vk)] : item.par;
-      const wmCaseHint = (currentLoc==='westmont' && vk==='greco' && WM_CASE_RULE_ITEMS_TOP[item.item]!==undefined)
-        ? ` · ${WM_CASE_RULE_ITEMS_TOP[item.item]} units = 1 case` : '';
+      let wmCaseHint = '';
+      if(currentLoc==='westmont' && vk==='greco' && WM_CASE_RULE_ITEMS_TOP[item.item]!==undefined){
+        const upc = WM_CASE_RULE_ITEMS_TOP[item.item];
+        const parIsCases = /case/i.test(item.par);
+        if(parIsCases){
+          const parCases = parseFloat(item.par)||0;
+          const totalUnits = parCases * upc;
+          wmCaseHint = ` (${totalUnits} units) · ${upc} units = 1 case`;
+        } else {
+          wmCaseHint = ` · ${upc} units = 1 case`;
+        }
+      }
       const meta = (item.num!=='—'?'#'+item.num+' · ':'')+'PAR: '+displayPar+wmCaseHint;
       const nameStyle = missingNum ? 'background:#FFF59D;border-radius:3px;padding:0 3px;display:inline-block;' : '';
       return `<div class="ProdRow" data-name="${item.item.toLowerCase()}">
@@ -2844,12 +2854,19 @@ function showCount(){
 
       // Group D: On Hand compared directly to Par, but ALWAYS orders exactly 1 case when triggered
       // (never the arithmetic difference) — for items ordered strictly by the case.
-      const WM_ALWAYS_ONE_CASE_ITEMS = new Set(['Pan - Full', 'Pan - Half', 'Pan - XL']);
+      const WM_ALWAYS_ONE_CASE_ITEMS = new Set(['Pan - Full', 'Pan - Half', 'Pan - XL', 'Dr - Franks']);
 
       // Group C: no case conversion at all — just compare On Hand to Par directly.
       // At/below 50% of Par -> order enough to bring it back up to Par (Par minus On Hand).
       const WM_DIRECT_PAR_ITEMS = new Set([
         'Butter Milk', 'Cheese - Lugano',
+      ]);
+
+      // Always-full-par items: fill enough to reach 100% of Par whenever under, no 50% threshold at all.
+      const WM_ALWAYS_FULL_PAR_ITEMS = new Set([
+        'Tomato Puree', 'Tomato Magic', 'Dough - King Wheat', 'Oil - Corn',
+        'Circle - 10"', 'Circle - 12"', 'Circle - 14"', 'Circle - 16"', 'Circle - 18"',
+        'Folder - 07"', 'Folder - 12"', 'Folder - 14"', 'Folder - 16"', 'Folder - 18"',
       ]);
 
       // Universal fallback for every other Greco item not specifically dictated:
@@ -2906,7 +2923,6 @@ function showCount(){
         'Dr - Mayo',
         'Dr - Red Wine Vin',
         'Dr - Tartar Sauce',
-        'Dr - Franks',
         'Hair Nets',
         'Liner - Sheet (16x24)',
         'Seasoning Salt Lawry\'s',
@@ -2914,11 +2930,9 @@ function showCount(){
         'Sheets - Foil 6ct',
         'Sheets - Sand Wrap',
         'Sheets - Wax Paper',
-        'Dough - King Wheat',
         'Dough - Salt',
         'Dough - Sugar',
         'Dough - Yeast',
-        'Oil - Corn',
         'Laz Sheets',
         'Pasta - Rav',
         'Canliner - Black',
@@ -2960,7 +2974,11 @@ function showCount(){
 
       if(f==='oh' && currentLoc==='westmont' && v2==='greco' && input.value!==''){
         let suggestedOrder = null;
-        if(WM_DIRECT_PAR_ITEMS.has(item.item)){
+        if(WM_ALWAYS_FULL_PAR_ITEMS.has(item.item)){
+          const parNum = parseFloat(item.par);
+          const ohNum = parseFloat(input.value)||0;
+          suggestedOrder = (!isNaN(parNum) && parNum>0 && ohNum < parNum) ? Math.round(parNum - ohNum) : 0;
+        } else if(WM_DIRECT_PAR_ITEMS.has(item.item)){
           const parNum = parseFloat(item.par);
           const ohNum = parseFloat(input.value)||0;
           if(!isNaN(parNum) && parNum>0 && (ohNum/parNum) <= 0.5){
@@ -2983,10 +3001,14 @@ function showCount(){
         } else if(WM_CASE_RULE_ITEMS_TOP[item.item]!==undefined){
           const unitsPerCase = WM_CASE_RULE_ITEMS_TOP[item.item];
           const ohNum = parseFloat(input.value)||0;
-          const ratio = ohNum / unitsPerCase;
+          const parRaw = parseFloat(item.par)||0;
+          // If Par is stored "in cases" (e.g. "2 cases"), convert to total units first so the
+          // 50% threshold reflects the TOTAL par, not just one case's worth.
+          const parIsCases = /case/i.test(item.par);
+          const parInUnits = parIsCases ? parRaw * unitsPerCase : parRaw;
+          const ratio = parInUnits>0 ? (ohNum / parInUnits) : (ohNum/unitsPerCase);
           if(ratio <= 0.5){
-            const parNum = parseFloat(item.par);
-            suggestedOrder = (!isNaN(parNum) && parNum>0) ? Math.round((parNum - ohNum)/unitsPerCase) || 1 : 1;
+            suggestedOrder = (parInUnits>0) ? Math.round((parInUnits - ohNum)/unitsPerCase) || 1 : 1;
             if(suggestedOrder < 1) suggestedOrder = 1;
           } else {
             suggestedOrder = 0;
