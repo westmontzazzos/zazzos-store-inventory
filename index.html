@@ -264,8 +264,8 @@ const DATA = {
     {loc:"Expo",item:"Potatoes",num:"60723",par:"1 case"},
     {loc:"Server",item:"Milk (2%)",num:"10312",par:"1 gallon"},
     {loc:"Server",item:"Powder Sugar",num:"50583",par:"1 box"},
-    {loc:"Server",item:"Square Cont (18oz)",num:"700060",par:"1 box"},
-    {loc:"Server",item:"Square Lid (18oz)",num:"700070",par:"1 box"},
+    {loc:"Server",item:"Square Cont (18oz)",num:"700060",par:"2 sleeves"},
+    {loc:"Server",item:"Square Lid (18oz)",num:"700070",par:"2 sleeves"},
     {loc:"Server",item:"Wrapped Straws",num:"70093",par:"1 box"},
     {loc:"Server",item:"Choc Syrup - Hershey's",num:"50476P",par:"2"},
     {loc:"Server",item:"Whip Cream - Aerosol",num:"10485P",par:"2"},
@@ -755,7 +755,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '9.8';
+const APP_VERSION = '9.9';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1117,8 +1117,8 @@ const WM_CASE_RULE_ITEMS_TOP = {
   'Breading - Fish Fry':6,
   'GF Pizza':24, 'Pepperoni':2, 'Dough - High Gluten':2, 'Bacon Bites':2, 'Pasta - Gnochi':2,
   'Cheese Ravioli':2, 'Pasta - Elbow':2, 'Pasta - Fettuccini':2, 'Pasta - Penne':2, 'Pasta - Spaghetti':2,
-  'Shrimp - Coconut':6, 'Shrimp - Jumbo':6, '14" Dessert Lid':40, '14" Dessert Tray':20,
-  'Square Cont (18oz)':4, 'Square Lid (18oz)':4,
+  'Shrimp - Coconut':4, 'Shrimp - Jumbo':6, '14" Dessert Lid':40, '14" Dessert Tray':20,
+
   'Garlic Spread':6, 'Sour Cream':9, 'Green Scrub Pad':10, 'Metal Scrub Pad':12, 'Mopheads':4, 'Dinner Napkins':10,
   'Dessert - Ch Cake':2, 'Dessert - Tiramisu':16,
 };
@@ -2595,6 +2595,7 @@ function showCount(){
       const prevDone = !SEQ() || items.slice(0,idx).every(p=>getC(vk,p,'oh')!=='' && getC(vk,p,'order')!=='');
       const missingNum = item.num==='—' || item.num==='' || item.num==='WESTMONT';
       const displayPar = (vk.startsWith('bread') && item[breadParFieldFor(vk)]!==undefined) ? item[breadParFieldFor(vk)] : item.par;
+      const WM_MANUAL_CASE_SIZES = { 'Gloves':10, 'Dough - Yeast':12, 'Square Cont (18oz)':4, 'Square Lid (18oz)':4 };
       let wmCaseHint = '';
       if(currentLoc==='westmont' && vk==='greco' && WM_CASE_RULE_ITEMS_TOP[item.item]!==undefined){
         const upc = WM_CASE_RULE_ITEMS_TOP[item.item];
@@ -2606,6 +2607,8 @@ function showCount(){
         } else {
           wmCaseHint = ` · ${upc} units = 1 case`;
         }
+      } else if(currentLoc==='westmont' && vk==='greco' && WM_MANUAL_CASE_SIZES[item.item]!==undefined){
+        wmCaseHint = ` · ${WM_MANUAL_CASE_SIZES[item.item]} units = 1 case`;
       }
       const meta = (item.num!=='—'?'#'+item.num+' · ':'')+'PAR: '+displayPar+wmCaseHint;
       const nameStyle = missingNum ? 'background:#FFF59D;border-radius:3px;padding:0 3px;display:inline-block;' : '';
@@ -2854,7 +2857,7 @@ function showCount(){
 
       // Group D: On Hand compared directly to Par, but ALWAYS orders exactly 1 case when triggered
       // (never the arithmetic difference) — for items ordered strictly by the case.
-      const WM_ALWAYS_ONE_CASE_ITEMS = new Set(['Pan - Full', 'Pan - Half', 'Pan - XL', 'Dr - Franks']);
+      const WM_ALWAYS_ONE_CASE_ITEMS = new Set(['Dr - Franks']);
 
       // Group C: no case conversion at all — just compare On Hand to Par directly.
       // At/below 50% of Par -> order enough to bring it back up to Par (Par minus On Hand).
@@ -2875,9 +2878,6 @@ function showCount(){
       // because the parNum>0 check below excludes them automatically.
       const WM_UNIVERSAL_FALLBACK_ITEMS = new Set([
         'Water Bottles',
-        'Fruit - Lemons',
-        'Fruit - Limes',
-        'Fruit - Oranges',
         'App - Bosco',
         'App - Pretzel',
         'Ice Cream',
@@ -2985,10 +2985,19 @@ function showCount(){
           } else {
             suggestedOrder = 0;
           }
-        } else if(item.item==='Gloves' || item.item==='Dough - Yeast'){
+        } else if(item.item==='Fruit - Lemons' || item.item==='Fruit - Limes' || item.item==='Fruit - Oranges'){
+          const WM_FRUIT_THRESHOLDS = { 'Fruit - Lemons':20, 'Fruit - Limes':20, 'Fruit - Oranges':5 };
+          const threshold = WM_FRUIT_THRESHOLDS[item.item];
+          const ohNum = parseFloat(input.value)||0;
+          suggestedOrder = (ohNum <= threshold) ? 1 : 0;
+        } else if(['Gloves','Dough - Yeast','Square Cont (18oz)','Square Lid (18oz)'].includes(item.item)){
           const parNum = parseFloat(item.par);
           const ohNum = parseFloat(input.value)||0;
           suggestedOrder = (!isNaN(parNum) && parNum>0 && ohNum <= parNum) ? 1 : 0;
+        } else if(['Pan - Full','Pan - Half','Pan - XL'].includes(item.item)){
+          const parNum = parseFloat(item.par);
+          const ohNum = parseFloat(input.value)||0;
+          suggestedOrder = (!isNaN(parNum) && parNum>0 && ohNum < parNum) ? 1 : 0;
         } else if(WM_ALWAYS_ONE_CASE_ITEMS.has(item.item)){
           const parNum = parseFloat(item.par);
           const ohNum = parseFloat(input.value)||0;
