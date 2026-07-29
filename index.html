@@ -195,7 +195,7 @@ const DATA = {
     {loc:"Prep",item:"Dr - Red Wine Vin",num:"38301",par:"1 gallon"},
     {loc:"Prep",item:"Dr - Tartar Sauce",num:"38111",par:"1 gallon"},
     {loc:"Prep",item:"Dr - Franks",num:"38040",par:"2 gallons"},
-    {loc:"Prep",item:"Gloves",num:"52943",par:"8 boxes"},
+    {loc:"Prep",item:"Gloves",num:"52943",par:"2 boxes"},
     {loc:"Prep",item:"Hair Nets",num:"52929",par:"1 bag"},
     {loc:"Prep",item:"Liner - Sheet (16x24)",num:"70642",par:"1 case"},
     {loc:"Prep",item:"Seasoning Salt Lawry's",num:"50639",par:"1 jug"},
@@ -221,7 +221,7 @@ const DATA = {
     {loc:"Dough",item:"Dough - King Wheat",num:"505154",par:"16 bags"},
     {loc:"Dough",item:"Dough - Salt",num:"50640",par:"1 bag"},
     {loc:"Dough",item:"Dough - Sugar",num:"50580",par:"1 bag"},
-    {loc:"Dough",item:"Dough - Yeast",num:"50553",par:"1 bag"},
+    {loc:"Dough",item:"Dough - Yeast",num:"50553",par:"2 bags"},
     {loc:"Dough",item:"Oil - Corn",num:"37105",par:"4 boxes"},
     {loc:"Cryo Fzr",item:"Bacon Bites",num:"201889",par:"4 bags"},
     {loc:"Cryo Fzr",item:"Laz Sheets",num:"50343",par:"1.5 cases"},
@@ -755,7 +755,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '9.7';
+const APP_VERSION = '9.8';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1114,7 +1114,7 @@ const WM_CASE_RULE_ITEMS_TOP = {
   'Veg - Celery':3, 'Veg - Green Onion':4,
   'Can - Black Olives':6, 'Dr - Blue Cheese':6, 'Can - Pineapple Bits':6,
   'Can - Sliced Jalapeno':6, 'Oil - Olive':6, 'Breading - Chx Fry':6, 'Can - Cheese Award':6,
-  'Breading - Fish Fry':6, 'Gloves':10,
+  'Breading - Fish Fry':6,
   'GF Pizza':24, 'Pepperoni':2, 'Dough - High Gluten':2, 'Bacon Bites':2, 'Pasta - Gnochi':2,
   'Cheese Ravioli':2, 'Pasta - Elbow':2, 'Pasta - Fettuccini':2, 'Pasta - Penne':2, 'Pasta - Spaghetti':2,
   'Shrimp - Coconut':6, 'Shrimp - Jumbo':6, '14" Dessert Lid':40, '14" Dessert Tray':20,
@@ -2932,7 +2932,6 @@ function showCount(){
         'Sheets - Wax Paper',
         'Dough - Salt',
         'Dough - Sugar',
-        'Dough - Yeast',
         'Laz Sheets',
         'Pasta - Rav',
         'Canliner - Black',
@@ -2986,6 +2985,10 @@ function showCount(){
           } else {
             suggestedOrder = 0;
           }
+        } else if(item.item==='Gloves' || item.item==='Dough - Yeast'){
+          const parNum = parseFloat(item.par);
+          const ohNum = parseFloat(input.value)||0;
+          suggestedOrder = (!isNaN(parNum) && parNum>0 && ohNum <= parNum) ? 1 : 0;
         } else if(WM_ALWAYS_ONE_CASE_ITEMS.has(item.item)){
           const parNum = parseFloat(item.par);
           const ohNum = parseFloat(input.value)||0;
