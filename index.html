@@ -745,17 +745,22 @@ const DATA = {
   ]},
 
   bread:{name:"Bread",emoji:"🍞",sub:"Bakery",items:[
-    {loc:"Bread",item:"Extra Longs",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
-    {loc:"Bread",item:"Sourdough Torpedo",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
-    {loc:"Bread",item:"4 Inch Rolls",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
-    {loc:"Bread",item:"Hamburger Buns",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
-    {loc:"Bread",item:"Bread Crumbs",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
-    {loc:"Bread",item:"Filone",num:"—",parMon:"—",parTue:"—",parWed:"—",parThu:"—",parFri:"—",parSat:"—",parSun:"—"},
+    {loc:"Cooler",item:"Filone",num:"—",parMon:"1",parTue:"1",parWed:"1",parThu:"1",parFri:"2",parSat:"2",parSun:"2"},
+    {loc:"Cooler",item:"Extra Longs",num:"—",parMon:"6",parTue:"6",parWed:"6",parThu:"6",parFri:"10",parSat:"10",parSun:"8"},
+    {loc:"Cooler",item:"Hamburger Buns",num:"—",parMon:"1",parTue:"1",parWed:"1",parThu:"1",parFri:"2",parSat:"2",parSun:"2"},
+    {loc:"Cooler",item:"4 Inch Rolls",num:"—",parMon:"0",parTue:"0",parWed:"0",parThu:"0",parFri:"0",parSat:"0",parSun:"0"},
+    {loc:"Cooler",item:"Sourdough Torpedo",num:"—",parMon:"3",parTue:"3",parWed:"3",parThu:"4",parFri:"6",parSat:"6",parSun:"6"},
+    {loc:"Cooler",item:"Bread Crumbs",num:"—",parMon:"1",parTue:"1",parWed:"1",parThu:"1",parFri:"1",parSat:"1",parSun:"1"},
+    {loc:"Line",item:"Filone",num:"—",parMon:"1",parTue:"1",parWed:"1",parThu:"1",parFri:"2",parSat:"2",parSun:"2"},
+    {loc:"Line",item:"Extra Longs",num:"—",parMon:"6",parTue:"6",parWed:"6",parThu:"6",parFri:"10",parSat:"10",parSun:"8"},
+    {loc:"Line",item:"Hamburger Buns",num:"—",parMon:"1",parTue:"1",parWed:"1",parThu:"1",parFri:"2",parSat:"2",parSun:"2"},
+    {loc:"Line",item:"4 Inch Rolls",num:"—",parMon:"0",parTue:"0",parWed:"0",parThu:"0",parFri:"0",parSat:"0",parSun:"0"},
+    {loc:"Line",item:"Sourdough Torpedo",num:"—",parMon:"3",parTue:"3",parWed:"3",parThu:"4",parFri:"6",parSat:"6",parSun:"6"},
   ]}
 }
 };
 let VENDORS = null;
-const APP_VERSION = '9.9';
+const APP_VERSION = '10.0';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -973,10 +978,24 @@ function showLogin(){
             reviewMode=false;
             enterBread();
           }
-        } else if(needsBreadParSetup()){
-          showBreadParSetup(()=>enterBread());
         } else {
-          enterBread();
+          // Darien
+          const todayD = new Date();
+          if(todayD.getDay()===6){
+            reviewMode=false;
+            enterBread();
+          } else if(completed['bread']){
+            showModal('Order Already Completed',
+              'This order was marked complete. What would you like to do?',
+              [
+                {l:'Review Order',c:'B-outline',fn:()=>{ closeModal(); activeVendor='bread'; reviewMode=true; showCount(); }},
+                {l:'Edit Order',c:'B-red',fn:()=>{ closeModal(); reviewMode=false; enterBread(); }}
+              ]
+            );
+          } else {
+            reviewMode=false;
+            enterBread();
+          }
         }
         return;
       }
@@ -1622,29 +1641,298 @@ async function wmFinishBreadOrder(){
 
 let pendingBreadReview = false;
 
+// ─── DARIEN BREAD FLOW: Cooler + Line + Breadcrumbs combined count ────────────
+function darienBreadParFieldForVk(vk){
+  if(vk==='bread_sunday') return 'parSun';
+  if(vk==='bread_monday') return 'parMon';
+  return BREAD_DAYS[new Date().getDay()];
+}
+
+function showDarienBreadcrumbsExplainer(onDismissForever, onContinue){
+  const dontShowAgain = localStorage.getItem('zaz_darien_bc_explainer_dismissed_'+currentLoc);
+  if(dontShowAgain){ onContinue(); return; }
+  app.innerHTML = `
+    <header class="H no-print"><div class="H-logo">Bread</div></header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Estimating Breadcrumbs</div>
+      <div style="font-size:14px;color:#444;line-height:1.6;margin-bottom:20px;">
+        Instead of a count, estimate how full the bucket is as a decimal — for example <strong>0.5</strong> for half full, or <strong>0.25</strong> for a quarter full. An order will only be suggested once you're at or below <strong>0.25</strong>.
+      </div>
+      <div class="LocBlock" style="padding:16px;display:flex;align-items:center;gap:10px;">
+        <input type="checkbox" id="bcDontShowAgain" style="width:20px;height:20px;">
+        <label for="bcDontShowAgain" style="font-size:14px;">Got it — don't show this again</label>
+      </div>
+    </div>
+    <div class="Footer no-print">
+      <button class="B B-red B-lg" style="width:100%;" id="bBcExplainerContinue">Continue →</button>
+    </div>`;
+  document.getElementById('bBcExplainerContinue').onclick = ()=>{
+    if(document.getElementById('bcDontShowAgain').checked){
+      localStorage.setItem('zaz_darien_bc_explainer_dismissed_'+currentLoc, '1');
+    }
+    onContinue();
+  };
+}
+
+function showDarienBreadCountScreen(){
+  const vk = activeVendor;
+  const parField = darienBreadParFieldForVk(vk);
+  const items = VENDORS.bread.items; // Cooler + Line + Breadcrumbs, all in one flat list
+
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"><button class="B B-ghost" id="bDarienBreadBack">← Home</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Cooler, Line &amp; Breadcrumbs</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Enter On Hand</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Count what's in the Cooler and on the Line. Breadcrumbs is estimated as a decimal (see below).</div>
+
+      ${['Cooler','Line'].map(loc=>`
+        <div class="LocBlock" style="margin-bottom:14px;">
+          <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#1B6B3A;text-transform:uppercase;letter-spacing:.04em;">${loc}</div>
+          ${items.filter(i=>i.loc===loc && i.item!=='Bread Crumbs').map(item=>{
+            const val = getC(vk, item, 'oh');
+            const par = item[parField];
+            return `<div class="ProdRow">
+              <div class="ProdRow-info">
+                <div class="ProdRow-name">${item.item}</div>
+                <div class="ProdRow-meta">PAR: ${par}</div>
+              </div>
+              <div class="DualInput">
+                <div class="IG"><label>On Hand</label>
+                  <input class="SI${val!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
+                    data-darienoh="${loc}|${item.item}" value="${val}" placeholder="0">
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`).join('')}
+
+      <div class="LocBlock">
+        <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:.04em;">Breadcrumbs</div>
+        ${(()=>{
+          const bcItem = items.find(i=>i.item==='Bread Crumbs');
+          const val = getC(vk, bcItem, 'oh');
+          return `<div class="ProdRow">
+            <div class="ProdRow-info">
+              <div class="ProdRow-name">Bread Crumbs</div>
+              <div class="ProdRow-meta">PAR: ${bcItem[parField]} bucket · enter as a decimal (0.25 = quarter full)</div>
+            </div>
+            <div class="DualInput">
+              <div class="IG"><label>On Hand</label>
+                <input class="SI${val!==''?' filled':''}" type="number" min="0" max="1" step="any" inputmode="decimal"
+                  data-darienbc="1" value="${val}" placeholder="0.5">
+              </div>
+            </div>
+          </div>`;
+        })()}
+      </div>
+    </div>
+    <div class="Footer no-print">
+      <button class="B B-red B-lg" style="width:100%;" id="bDarienBreadNext">Continue →</button>
+    </div>`;
+
+  document.getElementById('bDarienBreadBack').onclick = ()=>showLogin();
+
+  document.querySelectorAll('[data-darienoh]').forEach(inp=>{
+    inp.oninput = ()=>{
+      const [loc,name] = inp.dataset.darienoh.split('|');
+      const item = items.find(i=>i.loc===loc && i.item===name);
+      setC(vk, item, 'oh', inp.value);
+      inp.classList.toggle('filled', inp.value!=='');
+    };
+  });
+
+  const bcInput = document.querySelector('[data-darienbc]');
+  bcInput.oninput = ()=>{
+    const bcItem = items.find(i=>i.item==='Bread Crumbs');
+    setC(vk, bcItem, 'oh', bcInput.value);
+    bcInput.classList.toggle('filled', bcInput.value!=='');
+    // Whole-number safety re-trigger: if they type a whole number (not a decimal 0-1), the explainer must come back
+    const num = parseFloat(bcInput.value);
+    if(!isNaN(num) && Number.isInteger(num) && num >= 1){
+      localStorage.removeItem('zaz_darien_bc_explainer_dismissed_'+currentLoc);
+    }
+  };
+
+  document.getElementById('bDarienBreadNext').onclick = ()=>{
+    const missing = items.some(item => getC(vk, item, 'oh')==='');
+    if(missing){ showModal('Missing Counts','Please enter On Hand for every item.',[{l:'OK',c:'B-red',fn:closeModal}]); return; }
+
+    // Fill each item's Order = today's/this-delivery's par minus On Hand, floored at 0
+    items.forEach(item=>{
+      if(item.item==='Bread Crumbs'){
+        const bcOnHand = Number(getC(vk, item, 'oh')) || 0;
+        const bcPar = Number(item[parField]) || 1;
+        setC(vk, item, 'order', (bcOnHand <= 0.25) ? String(bcPar) : '0');
+      } else {
+        const oh = Number(getC(vk, item, 'oh')) || 0;
+        const par = Number(item[parField]) || 0;
+        setC(vk, item, 'order', String(Math.max(0, par - oh)));
+      }
+    });
+
+    showDarienBreadConfirmScreen();
+  };
+}
+
+function showDarienBreadConfirmScreen(){
+  const vk = activeVendor;
+  const items = VENDORS.bread.items;
+  const orderedItems = items.filter(item => {
+    const or = getC(vk, item, 'order');
+    return or !== '' && or !== '0';
+  });
+
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Confirm Order</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Here's what you're ordering</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Review before finalizing. Tap Edit to adjust quantities.</div>
+      <div class="LocBlock">
+        ${orderedItems.length===0 ? `<div style="padding:16px;color:#777;">No items to order — everything's at par.</div>` :
+          orderedItems.map(item=>`
+            <div class="ProdRow">
+              <div class="ProdRow-info">
+                <div class="ProdRow-name">${item.item}</div>
+                <div class="ProdRow-meta">${item.loc}</div>
+              </div>
+              <div style="font-weight:700;font-size:16px;color:#C8102E;">×${getC(vk,item,'order')}</div>
+            </div>`).join('')}
+      </div>
+    </div>
+    <div class="Footer no-print" style="display:flex;gap:8px;">
+      <button class="B B-outline" style="flex:1;" id="bDarienBreadBack2">← Back</button>
+      <button class="B B-outline" style="flex:1;" id="bDarienBreadEdit">✎ Edit</button>
+      <button class="B B-red" style="flex:2;" id="bDarienBreadComplete">✓ Confirm &amp; Complete</button>
+    </div>`;
+
+  document.getElementById('bDarienBreadEdit').onclick = ()=>showDarienBreadEditScreen();
+  document.getElementById('bDarienBreadBack2').onclick = ()=>showDarienBreadCountScreen();
+  document.getElementById('bDarienBreadComplete').onclick = async ()=>{
+    await finishOrderComplete(vk);
+  };
+}
+
+function showDarienBreadEditScreen(){
+  const vk = activeVendor;
+  const items = VENDORS.bread.items;
+
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="background:#C8102E;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Edit Quantities</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Add or remove quantities as needed</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Use the + and − buttons to adjust each item.</div>
+      <div class="LocBlock">
+        ${items.map(item=>{
+          const qty = Number(getC(vk, item, 'order')) || 0;
+          return `<div class="ProdRow">
+            <div class="ProdRow-info">
+              <div class="ProdRow-name">${item.item}</div>
+              <div class="ProdRow-meta">${item.loc}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <button class="B B-outline" style="width:44px;height:44px;padding:0;font-size:20px;font-weight:700;" data-editminus="${item.loc}|${item.item}">−</button>
+              <div style="min-width:32px;text-align:center;font-weight:700;font-size:18px;color:#C8102E;" data-editqty="${item.loc}|${item.item}">${qty}</div>
+              <button class="B B-outline" style="width:44px;height:44px;padding:0;font-size:20px;font-weight:700;" data-editplus="${item.loc}|${item.item}">+</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="Footer no-print">
+      <button class="B B-red B-lg" style="width:100%;" id="bDarienEditComplete">✓ Complete</button>
+    </div>`;
+
+  document.querySelectorAll('[data-editplus]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const [loc,name] = btn.dataset.editplus.split('|');
+      const item = items.find(i=>i.loc===loc && i.item===name);
+      const cur = Number(getC(vk, item, 'order')) || 0;
+      setC(vk, item, 'order', String(cur+1));
+      document.querySelector(`[data-editqty="${loc}|${name}"]`).textContent = cur+1;
+    };
+  });
+  document.querySelectorAll('[data-editminus]').forEach(btn=>{
+    btn.onclick = ()=>{
+      const [loc,name] = btn.dataset.editminus.split('|');
+      const item = items.find(i=>i.loc===loc && i.item===name);
+      const cur = Number(getC(vk, item, 'order')) || 0;
+      const next = Math.max(0, cur-1);
+      setC(vk, item, 'order', String(next));
+      document.querySelector(`[data-editqty="${loc}|${name}"]`).textContent = next;
+    };
+  });
+
+  document.getElementById('bDarienEditComplete').onclick = ()=>showDarienBreadConfirmScreen();
+}
+
 function enterBread(){
   if(currentLoc==='westmont'){
     enterBreadWestmont();
     return;
   }
 
-  // Darien: unchanged — per-day pars, optional Saturday dual order
+  // Darien: Cooler + Line + Breadcrumbs combined count, day-of-week par auto-fill
   const today=new Date();
   const dow=today.getDay(); // 0=Sun..6=Sat
   if(dow===6){
     const sunDone = !!completed['bread_sunday'];
     const monDone = !!completed['bread_monday'];
-    showModal('Saturday — Two Bread Orders',
-      'Saturday requires two separate Bread orders: one for Sunday delivery and one for Monday delivery. Both must be completed.',
-      [
-        {l:(sunDone?'✓ ':'')+'Sunday Delivery',c:sunDone?'B-outline':'B-red',fn:()=>{ closeModal(); startBreadOrder('sunday'); }},
-        {l:(monDone?'✓ ':'')+'Monday Delivery',c:monDone?'B-outline':'B-red',fn:()=>{ closeModal(); startBreadOrder('monday'); }}
-      ]
-    );
+    if(!sunDone && !monDone){
+      showModal('Saturday — Two Bread Orders',
+        'You will be prompted to order for both Sunday and Monday. This happens every Saturday and cannot be skipped.',
+        [{l:'Understood', c:'B-red', fn:()=>{ closeModal(); startDarienBreadOrder('sunday'); }}]
+      );
+    } else if(sunDone && !monDone){
+      showModal('Now — Monday\'s Order',
+        'Sunday\'s order is complete. Now you will be given the order for Monday.',
+        [{l:'Continue', c:'B-red', fn:()=>{ closeModal(); startDarienBreadOrder('monday'); }}]
+      );
+    } else {
+      showModal('Both Orders Complete',
+        'Sunday and Monday\'s Bread orders are both done for this Saturday.',
+        [
+          {l:'Review Sunday',c:'B-outline',fn:()=>{ closeModal(); activeVendor='bread_sunday'; reviewMode=true; showCount(); }},
+          {l:'Review Monday',c:'B-outline',fn:()=>{ closeModal(); activeVendor='bread_monday'; reviewMode=true; showCount(); }}
+        ]
+      );
+    }
   } else {
-    startBreadOrder(null);
+    startDarienBreadOrder(null);
   }
 }
+
+function startDarienBreadOrder(tag){
+  breadOrderTag = tag;
+  const vk = 'bread'+(tag?'_'+tag:'');
+  activeVendor = vk;
+  ensureBreadAliasState(vk);
+  if(!completed[vk]){
+    counts[vk] = {};
+    saveState();
+  }
+  const s = sess[vk];
+  if(s){
+    sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
+    showDarienBreadcrumbsExplainer(null, showDarienBreadCountScreen);
+  } else {
+    pendingDarienBreadCount = true;
+    showVerify(vk);
+  }
+}
+
+let pendingDarienBreadCount = false;
 
 // Which day of week this Bread order is actually FOR (delivery day), given the Saturday tag
 function breadDeliveryDow(tag){
@@ -1654,49 +1942,6 @@ function breadDeliveryDow(tag){
   return today.getDay();
 }
 
-function askStandingOrder(tag){
-  showModal('Standing Order?',
-    'Is this the standing Bread order, or do you need additional items?',
-    [
-      {l:'No — Additional Items',c:'B-outline',fn:()=>{ closeModal(); startBreadOrder(tag); }},
-      {l:'Yes — Standing Order',c:'B-red',fn:()=>{ closeModal(); startBreadOrder(tag, true); }}
-    ]
-  );
-}
-
-let pendingStandingOrderVk = null; // set when the user chose "standing order", applied once showCount renders
-
-function startBreadOrder(tag, useStanding){
-  breadOrderTag = tag;
-  const vk = 'bread'+(tag?'_'+tag:'');
-  activeVendor = vk;
-  ensureBreadAliasState(vk);
-  if(!openLocs[vk]) openLocs[vk]=getLocs('bread')[0];
-
-  if(useStanding) pendingStandingOrderVk = vk;
-
-  const s = sess[vk];
-  if(s){
-    sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
-    showCount();
-  } else {
-    showVerify(vk);
-  }
-}
-
-function applyPendingStandingOrder(){
-  if(!pendingStandingOrderVk) return;
-  const vk = pendingStandingOrderVk;
-  pendingStandingOrderVk = null;
-  const dow = breadDeliveryDow(breadOrderTag);
-  vdef(vk).items.forEach(item=>{
-    const std = BREAD_STANDING_ORDER[item.item];
-    if(std && std[dow]!==undefined){
-      setC(vk, item, 'oh', '0');
-      setC(vk, item, 'order', String(std[dow]));
-    }
-  });
-}
 
 // Saturday needs two independent Bread orders (Sun delivery + Mon delivery).
 // We register 'bread_sunday' / 'bread_monday' as their own vendor keys pointing at
@@ -2562,7 +2807,10 @@ function showDateEntry(vk, user){
     if(pendingBreadReview){
       pendingBreadReview = false;
       showWmReviewScreen();
-    } else if(vk.startsWith('bread')){
+    } else if(pendingDarienBreadCount){
+      pendingDarienBreadCount = false;
+      showDarienBreadcrumbsExplainer(null, showDarienBreadCountScreen);
+    } else if(vk.startsWith('bread') && currentLoc==='westmont'){
       showWmCountScreen();
     } else {
       showCount();
@@ -3064,24 +3312,14 @@ function showCount(){
       if(f==='oh' && currentLoc==='westmont' && v2==='gfs' && input.value!=='' && WM_GFS_CASES_ONLY_ITEMS.has(item.item)){
         const parNum = parseFloat(item.par);
         const ohCases = parseFloat(input.value)||0;
-        const suggestedOrder = (!isNaN(parNum) && parNum>0 && (ohCases/parNum) <= 0.5) ? 1 : 0;
+        const suggestedOrder = (!isNaN(parNum) && parNum>0 && (ohCases/parNum) <= 0.5) ? Math.round(parNum - ohCases) : 0;
         setC(v2, item, 'order', String(suggestedOrder));
         const orderInput = allInputs.find(x=>x.dataset.vk===v2 && x.dataset.loc===loc && x.dataset.idx===idx && x.dataset.f==='order');
         if(orderInput){
           orderInput.value = suggestedOrder;
           orderInput.classList.toggle('filled', suggestedOrder>0);
           let caseTag = orderInput.parentElement.querySelector('.wmCaseTag');
-          if(suggestedOrder>0){
-            if(!caseTag){
-              caseTag = document.createElement('div');
-              caseTag.className = 'wmCaseTag';
-              caseTag.style.cssText = 'font-size:9px;font-weight:700;color:#1B6B3A;text-align:center;margin-top:2px;';
-              orderInput.parentElement.appendChild(caseTag);
-            }
-            caseTag.textContent = '= 1 CASE';
-          } else if(caseTag){
-            caseTag.remove();
-          }
+          if(caseTag) caseTag.remove();
         }
       }
 
@@ -3093,7 +3331,7 @@ function showCount(){
         if(!isNaN(parNum) && parNum>0){
           const ohNum = parseFloat(input.value)||0;
           const ratio = ohNum / parNum;
-          const suggestedOrder = ratio <= 0.25 ? Math.round(parNum - ohNum) : 0;
+          const suggestedOrder = ratio <= 0.5 ? Math.round(parNum - ohNum) : 0;
           setC(v2, item, 'order', String(suggestedOrder));
           const orderInput = allInputs.find(x=>x.dataset.vk===v2 && x.dataset.loc===loc && x.dataset.idx===idx && x.dataset.f==='order');
           if(orderInput){
