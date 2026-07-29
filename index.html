@@ -755,7 +755,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '9.4';
+const APP_VERSION = '9.5';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -922,6 +922,7 @@ function showLogin(){
         <button class="B B-outline" style="flex:1;" id="bSwitchLoc">⇄ Switch Location</button>
         <button class="B B-outline" style="flex:1;" id="bAddonLogBtn">📋 Add-Ons Log</button>
       </div>
+      <button class="B B-outline" style="width:100%;max-width:320px;margin-top:8px;" id="bFlagIssueBtn">🎙 Flag an Issue</button>
     </div>`;
 
 
@@ -949,6 +950,7 @@ function showLogin(){
 
   document.getElementById('bSwitchLoc')?.addEventListener('click',()=>{ currentLoc=null; VENDORS=null; showLogin(); });
   document.getElementById('bAddonLogBtn')?.addEventListener('click',()=>{ showAddonLog(); });
+  document.getElementById('bFlagIssueBtn')?.addEventListener('click',()=>{ showIssueNote(); });
   document.querySelectorAll('.LCard[data-vk]').forEach(el=>{
     el.onclick=()=>{
       activeVendor=el.dataset.vk;
@@ -2329,6 +2331,52 @@ function showDashOrderView(vendorName, entry){
   );
 }
 
+function showIssueNote(){
+  const vendorName = activeVendor ? (vdef(activeVendor)?.name || activeVendor) : '';
+  const locName = activeVendor ? (openLocs[activeVendor] || '') : '';
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Issue Note</div>
+      <div class="H-right"><button class="B B-ghost" id="bIssueNoteClose">✕ Close</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Flag an Issue</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Type it, or tap the microphone on your keyboard to talk instead. This gets saved so Claude can pull it up and fix it later.</div>
+      <div class="LocBlock" style="padding:16px;">
+        <div style="font-size:11px;font-weight:700;color:#777;text-transform:uppercase;margin-bottom:6px;">Context (auto-filled)</div>
+        <div style="font-size:14px;margin-bottom:16px;">${vendorName || '—'}${locName ? ' · ' + locName : ''}</div>
+        <textarea id="issueNoteText" rows="6" placeholder="e.g. Sautee Fzr — Cod par is wrong, should be 2 not 1"
+          style="width:100%;border:2px solid #E2E2E2;border-radius:8px;padding:12px;font-size:15px;font-family:'Inter',sans-serif;"></textarea>
+      </div>
+    </div>
+    <div class="Footer no-print">
+      <button class="B B-red B-lg" style="width:100%;" id="bIssueNoteSave">✓ Save Note</button>
+    </div>`;
+
+  document.getElementById('bIssueNoteClose').onclick = ()=>{ activeVendor ? showCount() : showLogin(); };
+  document.getElementById('issueNoteText').focus();
+
+  document.getElementById('bIssueNoteSave').onclick = async ()=>{
+    const noteText = document.getElementById('issueNoteText').value.trim();
+    if(!noteText) return;
+    try{
+      await supa('issue_notes', {
+        method:'POST',
+        body: JSON.stringify({
+          store: currentLoc||'',
+          vendor: vendorName,
+          location: locName,
+          note: noteText,
+          created_by: sessionUser||currentUser||''
+        })
+      });
+      showModal('Saved', 'Your note has been saved.', [{l:'OK',c:'B-red',fn:()=>{ closeModal(); activeVendor ? showCount() : showLogin(); }}]);
+    }catch(e){
+      showModal('Error', 'Could not save the note — check your connection and try again.', [{l:'OK',c:'B-red',fn:closeModal}]);
+    }
+  };
+}
+
 function showAddonLog(){
   let log=[];
   try{ log=JSON.parse(localStorage.getItem('zaz_addon_log_'+currentLoc)||'[]'); }catch(e){}
@@ -2534,6 +2582,7 @@ function showCount(){
     <header class="H no-print">
       <div class="H-logo" id="vendorLogo">${v.name}</div>
       <div class="H-right">
+        <button class="B B-ghost" id="bFlagIssueCount">🎙</button>
         <button class="B B-ghost" id="bBlank">🖨 Blank</button>
         <button class="B B-ghost" id="bHome">← Home</button>
       </div>
@@ -2572,6 +2621,7 @@ function showCount(){
 
   // Header/footer buttons
   document.getElementById('bHome').onclick=document.getElementById('bHome2').onclick=()=>showLogin();
+  document.getElementById('bFlagIssueCount')?.addEventListener('click',()=>{ showIssueNote(); });
 
 
   // 4-tap vendor name = free roam on/off
