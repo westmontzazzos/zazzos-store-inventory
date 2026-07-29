@@ -755,7 +755,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '9.5';
+const APP_VERSION = '9.6';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -905,7 +905,8 @@ function showLogin(){
   const locLabel = currentLoc.charAt(0).toUpperCase()+currentLoc.slice(1);
   app.innerHTML=`
     <div class="Login">
-      <div>
+      <div style="position:relative;width:100%;">
+        <button class="B B-ghost" style="position:absolute;top:0;right:0;font-size:12px;padding:6px 10px;height:auto;" id="bFlagIssueBtn">🎙 Flag Issue</button>
         <div class="Login-logo">Z<span class="secretA" style="cursor:pointer;">a</span>zz<span id="secretO" style="cursor:pointer;">o</span>'<span class="secretS" style="cursor:pointer;">s</span></div>
         <div id="locTitle" style="font-family:'Libre Baskerville',Georgia,serif;font-size:22px;font-weight:700;color:#111;text-align:center;margin-top:4px;cursor:pointer;user-select:none;">${locLabel}</div>
         <div class="Login-tag">Inventory</div>
@@ -922,7 +923,6 @@ function showLogin(){
         <button class="B B-outline" style="flex:1;" id="bSwitchLoc">⇄ Switch Location</button>
         <button class="B B-outline" style="flex:1;" id="bAddonLogBtn">📋 Add-Ons Log</button>
       </div>
-      <button class="B B-outline" style="width:100%;max-width:320px;margin-top:8px;" id="bFlagIssueBtn">🎙 Flag an Issue</button>
     </div>`;
 
 
@@ -2334,47 +2334,111 @@ function showDashOrderView(vendorName, entry){
 function showIssueNote(){
   const vendorName = activeVendor ? (vdef(activeVendor)?.name || activeVendor) : '';
   const locName = activeVendor ? (openLocs[activeVendor] || '') : '';
+
   app.innerHTML = `
     <header class="H no-print">
-      <div class="H-logo">Issue Note</div>
+      <div class="H-logo">Issue Notes</div>
       <div class="H-right"><button class="B B-ghost" id="bIssueNoteClose">✕ Close</button></div>
     </header>
     <div class="Page" style="margin-top:76px;">
       <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Flag an Issue</div>
-      <div style="font-size:13px;color:#777;margin-bottom:18px;">Type it, or tap the microphone on your keyboard to talk instead. This gets saved so Claude can pull it up and fix it later.</div>
-      <div class="LocBlock" style="padding:16px;">
-        <div style="font-size:11px;font-weight:700;color:#777;text-transform:uppercase;margin-bottom:6px;">Context (auto-filled)</div>
-        <div style="font-size:14px;margin-bottom:16px;">${vendorName || '—'}${locName ? ' · ' + locName : ''}</div>
-        <textarea id="issueNoteText" rows="6" placeholder="e.g. Sautee Fzr — Cod par is wrong, should be 2 not 1"
+      <div style="font-size:13px;color:#777;margin-bottom:14px;">Context: <strong>${vendorName || '—'}${locName ? ' · ' + locName : ''}</strong></div>
+
+      <div class="LocBlock" style="padding:16px;margin-bottom:16px;">
+        <textarea id="issueNoteText" rows="4" placeholder="Tap the mic below to start talking, or type here..."
           style="width:100%;border:2px solid #E2E2E2;border-radius:8px;padding:12px;font-size:15px;font-family:'Inter',sans-serif;"></textarea>
+        <button class="B B-red B-lg" style="width:100%;margin-top:10px;" id="bIssueRecordToggle">🎙 Start</button>
       </div>
-    </div>
-    <div class="Footer no-print">
-      <button class="B B-red B-lg" style="width:100%;" id="bIssueNoteSave">✓ Save Note</button>
+
+      <div style="font-size:11px;font-weight:700;color:#777;text-transform:uppercase;margin-bottom:8px;">All Notes</div>
+      <div id="issueNoteList"><div style="padding:16px;color:#777;font-size:13px;">Loading...</div></div>
     </div>`;
 
   document.getElementById('bIssueNoteClose').onclick = ()=>{ activeVendor ? showCount() : showLogin(); };
-  document.getElementById('issueNoteText').focus();
 
-  document.getElementById('bIssueNoteSave').onclick = async ()=>{
-    const noteText = document.getElementById('issueNoteText').value.trim();
-    if(!noteText) return;
-    try{
-      await supa('issue_notes', {
-        method:'POST',
-        body: JSON.stringify({
-          store: currentLoc||'',
-          vendor: vendorName,
-          location: locName,
-          note: noteText,
-          created_by: sessionUser||currentUser||''
-        })
-      });
-      showModal('Saved', 'Your note has been saved.', [{l:'OK',c:'B-red',fn:()=>{ closeModal(); activeVendor ? showCount() : showLogin(); }}]);
-    }catch(e){
-      showModal('Error', 'Could not save the note — check your connection and try again.', [{l:'OK',c:'B-red',fn:closeModal}]);
+  let recording = false;
+  document.getElementById('bIssueRecordToggle').onclick = ()=>{
+    const textEl = document.getElementById('issueNoteText');
+    if(!recording){
+      recording = true;
+      document.getElementById('bIssueRecordToggle').textContent = '⏹ Stop & Save';
+      textEl.focus();
+    } else {
+      recording = false;
+      const noteText = textEl.value.trim();
+      if(noteText){
+        saveIssueNote(noteText, vendorName, locName);
+      }
+      textEl.value = '';
+      document.getElementById('bIssueRecordToggle').textContent = '🎙 Start';
     }
   };
+
+  loadIssueNotes();
+}
+
+async function saveIssueNote(noteText, vendorName, locName){
+  try{
+    await supa('issue_notes', {
+      method:'POST',
+      body: JSON.stringify({
+        store: currentLoc||'',
+        vendor: vendorName,
+        location: locName,
+        note: noteText,
+        created_by: sessionUser||currentUser||''
+      })
+    });
+    loadIssueNotes();
+  }catch(e){
+    showModal('Error', 'Could not save the note — check your connection and try again.', [{l:'OK',c:'B-red',fn:closeModal}]);
+  }
+}
+
+async function loadIssueNotes(){
+  const listEl = document.getElementById('issueNoteList');
+  if(!listEl) return;
+  try{
+    const res = await supa('issue_notes?order=created_at.desc&limit=100');
+    const notes = await res.json();
+    if(!notes.length){
+      listEl.innerHTML = `<div style="padding:16px;color:#777;font-size:13px;">No notes yet.</div>`;
+      return;
+    }
+    listEl.innerHTML = notes.map(n=>`
+      <div class="LocBlock" style="margin-bottom:10px;padding:14px 16px;">
+        <div style="font-size:10px;font-weight:700;color:#777;text-transform:uppercase;margin-bottom:6px;">
+          ${n.vendor || '—'}${n.location ? ' · '+n.location : ''} · ${new Date(n.created_at).toLocaleDateString()} · ${n.created_by||''}
+        </div>
+        <textarea data-note-id="${n.id}" rows="2"
+          style="width:100%;border:2px solid #E2E2E2;border-radius:8px;padding:8px;font-size:14px;font-family:'Inter',sans-serif;margin-bottom:8px;">${n.note}</textarea>
+        <div style="display:flex;gap:8px;">
+          <button class="B B-outline" style="flex:1;font-size:12px;" data-save-note="${n.id}">Save Edit</button>
+          <button class="B B-outline" style="flex:1;font-size:12px;color:#C8102E;border-color:#C8102E;" data-delete-note="${n.id}">Delete</button>
+        </div>
+      </div>`).join('');
+
+    listEl.querySelectorAll('[data-save-note]').forEach(btn=>{
+      btn.onclick = async ()=>{
+        const id = btn.dataset.saveNote;
+        const newText = listEl.querySelector(`[data-note-id="${id}"]`).value.trim();
+        try{
+          await supa('issue_notes?id=eq.'+id, { method:'PATCH', body: JSON.stringify({ note:newText }) });
+        }catch(e){}
+      };
+    });
+    listEl.querySelectorAll('[data-delete-note]').forEach(btn=>{
+      btn.onclick = async ()=>{
+        const id = btn.dataset.deleteNote;
+        try{
+          await supa('issue_notes?id=eq.'+id, { method:'DELETE' });
+          loadIssueNotes();
+        }catch(e){}
+      };
+    });
+  }catch(e){
+    listEl.innerHTML = `<div style="padding:16px;color:#C8102E;font-size:13px;">Could not load notes — check your connection.</div>`;
+  }
 }
 
 function showAddonLog(){
