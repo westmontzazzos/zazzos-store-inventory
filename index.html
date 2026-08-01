@@ -760,7 +760,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '10.3';
+const APP_VERSION = '10.4';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2331,24 +2331,41 @@ async function showOrderHistory(){
       // group by batch
       const batches={};
       rows.forEach(r=>{
-        if(!batches[r.batch_id]) batches[r.batch_id]={store:r.store,vendor:r.vendor,date:r.order_date,by:r.counted_by,lines:0,qty:0,created:r.created_at};
+        if(!batches[r.batch_id]) batches[r.batch_id]={store:r.store,vendor:r.vendor,date:r.order_date,by:r.counted_by,lines:0,qty:0,created:r.created_at,items:[]};
         batches[r.batch_id].lines++;
         batches[r.batch_id].qty+=(+r.qty||0);
+        batches[r.batch_id].items.push({item:r.item, qty:r.qty});
       });
       const list=Object.values(batches).sort((a,b)=>b.created<a.created?-1:1);
+      window.zazHistBatches = batches; // stash for tap handler below
 
       out.style.cssText='';
       out.innerHTML=`
         <div style="font-family:'Libre Baskerville',Georgia,serif;font-weight:700;font-size:14px;margin:4px 0 8px;">Recent Orders</div>
-        ${list.map(b=>`
-          <div style="background:#fff;border-radius:8px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+        ${list.map((b,i)=>`
+          <div data-histbatch="${b.store}|${b.vendor}|${b.date}|${b.created}" style="cursor:pointer;background:#fff;border-radius:8px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
             <div style="display:flex;justify-content:space-between;align-items:center;">
               <strong style="font-size:14px;">${b.store.charAt(0).toUpperCase()+b.store.slice(1)} · ${b.vendor}</strong>
-              <span style="color:#C8102E;font-weight:700;font-size:13px;">${b.lines} items</span>
+              <span style="color:#C8102E;font-weight:700;font-size:13px;text-decoration:underline;">${b.lines} items</span>
             </div>
             <div style="font-size:12px;color:#777;margin-top:3px;">${b.date||'—'} · ${b.by||'—'} · total qty ${b.qty}</div>
           </div>`).join('')}
         <div style="font-size:11px;color:#999;text-align:center;padding:8px;">Search an item above for totals & averages.</div>`;
+
+      document.querySelectorAll('[data-histbatch]').forEach(card=>{
+        card.onclick = ()=>{
+          const key = card.dataset.histbatch;
+          const b = Object.values(window.zazHistBatches).find(bb=>`${bb.store}|${bb.vendor}|${bb.date}|${bb.created}`===key);
+          if(!b) return;
+          showModal(`${b.store.charAt(0).toUpperCase()+b.store.slice(1)} · ${b.vendor} — ${b.date||'—'}`,
+            `<div style="text-align:left;font-size:13px;max-height:320px;overflow-y:auto;">
+              <div style="color:#777;margin-bottom:8px;">Counted by ${b.by||'—'} · Total qty ${b.qty}</div>
+              ${b.items.map(i=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F0F0F0;"><span>${i.item}</span><strong style="color:#C8102E;">×${i.qty}</strong></div>`).join('')}
+            </div>`,
+            [{l:'Close',c:'B-red',fn:closeModal}]
+          );
+        };
+      });
     }catch(e){
       out.innerHTML='Could not reach the database. Check your connection.';
     }
