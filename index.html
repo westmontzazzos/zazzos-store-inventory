@@ -760,7 +760,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '10.2';
+const APP_VERSION = '10.3';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2555,7 +2555,12 @@ function renderDashboard(){
       const done = wasCompletedOn(vendor, d, currentLoc);
       const isFuture = d > now && d.toDateString()!==now.toDateString();
       if(done){
-        return `<td style="background:#E6F4EA;border:1px solid #DDD;text-align:center;cursor:pointer;" data-dashcell="${vendor}|${localISO(d)}"><span style="color:#1B6B3A;font-size:22px;font-weight:700;">✓</span></td>`;
+        const entry = findCompletedEntry(vendor, d, currentLoc);
+        const count = entry ? entry.itemsOrdered : 0;
+        return `<td style="background:#E6F4EA;border:1px solid #DDD;text-align:center;cursor:pointer;" data-dashcell="${vendor}|${localISO(d)}">
+          <div style="color:#1B6B3A;font-size:16px;font-weight:700;">✓</div>
+          <div style="color:#1B6B3A;font-size:11px;font-weight:700;text-decoration:underline;">${count} items</div>
+        </td>`;
       } else if(isFuture){
         return '<td style="background:#fff;border:1px solid #DDD;text-align:center;color:#BBB;font-size:12px;">—</td>';
       } else {
