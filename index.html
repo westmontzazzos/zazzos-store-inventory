@@ -760,7 +760,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '10.0';
+const APP_VERSION = '10.1';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2115,7 +2115,18 @@ async function finishOrderComplete(vk){
     });
     localStorage.setItem(logKey, JSON.stringify(log));
   }catch(e){}
-  await pushOrderToSupabase(vk);
+
+  const pushed = await pushOrderToSupabase(vk);
+  if(!pushed){
+    showModal('⚠ Order Not Saved',
+      'This order could not be saved to the shared log — check your internet connection. Your counts are still here on this device. Tap Retry to try again, or Save Locally Only to continue (you\'ll need to report this order manually).',
+      [
+        {l:'Save Locally Only', c:'B-outline', fn:()=>{ closeModal(); showLogin(); }},
+        {l:'Retry', c:'B-red', fn: async ()=>{ closeModal(); await finishOrderComplete(vk); }}
+      ]
+    );
+    return;
+  }
   showLogin();
 }
 
@@ -2167,7 +2178,8 @@ async function pushOrderToSupabase(vk){
     const batch = currentLoc+'|'+vdef(vk).name+'|'+(currentDate||'');
     // Remove old rows for this batch, then insert the current full set —
     // this represents "the order as it stands now" without touching other batches.
-    await supa('inventory_orders?batch_id=eq.'+encodeURIComponent(batch), {method:'DELETE'});
+    const delRes = await supa('inventory_orders?batch_id=eq.'+encodeURIComponent(batch), {method:'DELETE'});
+    if(!delRes.ok) throw new Error('delete failed: '+delRes.status);
     const rows=[];
     vdef(vk).items.forEach(item=>{
       const or=getC(vk,item,'order');
@@ -2200,8 +2212,15 @@ async function pushOrderToSupabase(vk){
         delivery_date: usToISO(deliveryDate)
       });
     });
-    if(rows.length) await supa('inventory_orders', {method:'POST', body:JSON.stringify(rows)});
-  }catch(e){ console.error('order push failed', e); }
+    if(rows.length){
+      const postRes = await supa('inventory_orders', {method:'POST', body:JSON.stringify(rows)});
+      if(!postRes.ok) throw new Error('insert failed: '+postRes.status);
+    }
+    return true;
+  }catch(e){
+    console.error('order push failed', e);
+    return false;
+  }
 }
 
 async function logOrderToCloud(vk, mode){
@@ -2466,32 +2485,59 @@ function scheduledVendors(dow, store){
   return list.sort();
 }
 
+let dashboardCache = []; // rows pulled from Supabase for the currently-viewed store
+
+async function fetchDashboardData(store){
+  try{
+    const res = await supa('inventory_orders?store=eq.'+encodeURIComponent(store)+'&select=vendor,item,qty,order_date,delivery_date,counted_by,created_at,batch_id&order=created_at.desc&limit=2000');
+    if(!res.ok) return [];
+    return await res.json();
+  }catch(e){ return []; }
+}
+
 function wasCompletedOn(vendorName, dateObj, store){
   const iso = localISO(dateObj);
-  try{
-    const log = JSON.parse(localStorage.getItem('zaz_store_log_'+store)||'[]');
-    return log.some(e=>{
-      const d = e.completionDate || (e.orderDate ? usToISO(e.orderDate) : null);
-      return d===iso && (e.vendor===vendorName || (vendorName==='Bread' && e.vendor && e.vendor.startsWith('Bread')));
-    });
-  }catch(e){ return false; }
+  return dashboardCache.some(row=>{
+    const rowVendor = row.vendor||'';
+    const matchesVendor = rowVendor===vendorName || (vendorName==='Bread' && rowVendor.startsWith('Bread'));
+    return matchesVendor && row.order_date===iso;
+  });
 }
 
 function findCompletedEntry(vendorName, dateObj, store){
   const iso = localISO(dateObj);
-  try{
-    const log = JSON.parse(localStorage.getItem('zaz_store_log_'+store)||'[]');
-    return log.find(e=>{
-      const d = e.completionDate || (e.orderDate ? usToISO(e.orderDate) : null);
-      return d===iso && (e.vendor===vendorName || (vendorName==='Bread' && e.vendor && e.vendor.startsWith('Bread')));
-    }) || null;
-  }catch(e){ return null; }
+  const rows = dashboardCache.filter(row=>{
+    const rowVendor = row.vendor||'';
+    const matchesVendor = rowVendor===vendorName || (vendorName==='Bread' && rowVendor.startsWith('Bread'));
+    return matchesVendor && row.order_date===iso;
+  });
+  if(!rows.length) return null;
+  const itemRows = rows.filter(r=>!r.item.startsWith('[ADD-ON]'));
+  const addonRows = rows.filter(r=>r.item.startsWith('[ADD-ON]'));
+  return {
+    store,
+    vendor: vendorName,
+    orderDate: rows[0].order_date ? usFromISO(rows[0].order_date) : '—',
+    deliveryDate: rows[0].delivery_date ? usFromISO(rows[0].delivery_date) : '—',
+    user: rows[0].counted_by || '—',
+    itemsOrdered: itemRows.length,
+    addonCount: addonRows.length,
+    completedAt: rows[0].created_at,
+    items: itemRows
+  };
 }
+
+function usFromISO(iso){
+  if(!iso) return '—';
+  const [y,m,d] = iso.split('-');
+  return `${m}/${d}/${y}`;
+}
+
 
 function showDashboard(){
   showModal('📱 Rotate Your Phone',
     'This dashboard is easiest to read in landscape mode. Rotate your phone sideways, then tap Continue.',
-    [{l:'Continue →',c:'B-red',fn:()=>{ closeModal(); renderDashboard(); }}]
+    [{l:'Continue →',c:'B-red',fn: async ()=>{ closeModal(); dashboardCache = await fetchDashboardData(currentLoc); renderDashboard(); }}]
   );
 }
 
@@ -3323,10 +3369,31 @@ function showCount(){
         }
       }
 
-      // Auto-populate Order for GFS/Marlin at Westmont only — original rule, untouched.
+      // GFS: always order exactly 1 case when triggered — Croutons at/below full Par, Saltine Crackers at/below 50% of Par
+      if(f==='oh' && currentLoc==='westmont' && v2==='gfs' && input.value!==''){
+        const parNum = parseFloat(item.par);
+        const ohNum = parseFloat(input.value)||0;
+        let suggestedOrder = null;
+        if(item.item==='Croutons' && !isNaN(parNum) && parNum>0){
+          suggestedOrder = (ohNum <= parNum) ? 1 : 0;
+        } else if(item.item==='Saltine Crackers' && !isNaN(parNum) && parNum>0){
+          suggestedOrder = ((ohNum/parNum) <= 0.5) ? 1 : 0;
+        }
+        if(suggestedOrder!==null){
+          setC(v2, item, 'order', String(suggestedOrder));
+          const orderInput = allInputs.find(x=>x.dataset.vk===v2 && x.dataset.loc===loc && x.dataset.idx===idx && x.dataset.f==='order');
+          if(orderInput){
+            orderInput.value = suggestedOrder;
+            orderInput.classList.toggle('filled', suggestedOrder>0);
+          }
+        }
+      }
+
+      // Auto-populate Order for GFS/Marlin at Westmont only — original rule, untouched for Marlin.
       // Rule: if On Hand is at or below 25% of Par, order enough to bring it back up to Par (rounded to a whole unit).
-      // Skips the 3 GFS items already handled above by the case rule.
-      if(f==='oh' && currentLoc==='westmont' && ['gfs','marlin'].includes(v2) && input.value!=='' && !WM_GFS_CASES_ONLY_ITEMS.has(item.item)){
+      // Skips the 3 GFS case-only items above, plus GFS's Croutons/Saltine Crackers (always-1-case). Marlin is unaffected.
+      const WM_GFS_ALWAYS_ONE_CASE = new Set(['Croutons','Saltine Crackers']);
+      if(f==='oh' && currentLoc==='westmont' && ['gfs','marlin'].includes(v2) && input.value!=='' && !WM_GFS_CASES_ONLY_ITEMS.has(item.item) && !WM_GFS_ALWAYS_ONE_CASE.has(item.item)){
         const parNum = parseFloat(item.par);
         if(!isNaN(parNum) && parNum>0){
           const ohNum = parseFloat(input.value)||0;
