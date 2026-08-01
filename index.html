@@ -760,7 +760,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '10.1';
+const APP_VERSION = '10.2';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2605,18 +2605,21 @@ function showDashOrderView(vendorName, entry){
     showModal('Not Found','Could not locate this order.',[{l:'OK',c:'B-red',fn:()=>{ closeModal(); renderDashboard(); }}]);
     return;
   }
-  // Pull the actual saved order for this date from local counts if it's still the active session,
-  // otherwise show the store-log summary (Supabase holds full detail; this is the quick local view).
+  const itemRows = (entry.items||[]).map(i=>`
+    <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F0F0F0;">
+      <span>${i.item}</span><span style="font-weight:700;color:#C8102E;">×${i.qty}</span>
+    </div>`).join('') || '<div style="color:#999;">No items recorded.</div>';
+
   showModal('Order Summary — '+vendorName,
-    `<div style="text-align:left;line-height:1.9;font-size:13px;">
+    `<div style="text-align:left;line-height:1.8;font-size:13px;">
       <strong>Store:</strong> ${entry.store}<br>
       <strong>Vendor:</strong> ${entry.vendor}<br>
       <strong>Order Date:</strong> ${entry.orderDate||'—'}<br>
       <strong>Delivery Date:</strong> ${entry.deliveryDate||'—'}<br>
       <strong>Counted By:</strong> ${entry.user||'—'}<br>
-      <strong>Items Ordered:</strong> ${entry.itemsOrdered}<br>
-      <strong>Add-Ons:</strong> ${entry.addonCount}<br>
       <strong>Completed At:</strong> ${entry.completedAt ? new Date(entry.completedAt).toLocaleString() : '—'}
+      <div style="margin-top:12px;padding-top:10px;border-top:2px solid #1A1A2E;font-weight:700;">Items Ordered (${entry.itemsOrdered})</div>
+      <div style="max-height:280px;overflow-y:auto;margin-top:6px;">${itemRows}</div>
     </div>`,
     [{l:'← Back to Dashboard',c:'B-red',fn:()=>{ closeModal(); renderDashboard(); }}]
   );
