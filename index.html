@@ -289,6 +289,8 @@ const DATA = {
   ]},
 
   gfs:{name:"GFS",emoji:"🥗",sub:"Food Service",items:[
+    {loc:"Cooler",item:"Angus Burgers",num:"—",par:"2 cases"},
+    {loc:"Freezer",item:"Cod",num:"—",par:"2 bags"},
     {loc:"WIF",item:"Bavarian Pretzel",num:"794822",par:"1 case"},
     {loc:"WIF",item:"Bosco Sticks",num:"432180",par:"1 case"},
     {loc:"WIF",item:"Chx - 4oz Precooked",num:"460752",par:"4 cases"},
@@ -760,7 +762,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '10.4';
+const APP_VERSION = '10.5';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3379,7 +3381,7 @@ function showCount(){
       }
 
       // GFS: case-based items — Par is already stored in cases, check directly against 50% of Par
-      const WM_GFS_CASES_ONLY_ITEMS = new Set(['Chx - 4oz Precooked', 'Chx - Tenders', 'Fries']);
+      const WM_GFS_CASES_ONLY_ITEMS = new Set(['Chx - 4oz Precooked', 'Chx - Tenders', 'Fries', 'Cod']);
       if(f==='oh' && currentLoc==='westmont' && v2==='gfs' && input.value!=='' && WM_GFS_CASES_ONLY_ITEMS.has(item.item)){
         const parNum = parseFloat(item.par);
         const ohCases = parseFloat(input.value)||0;
@@ -3403,6 +3405,10 @@ function showCount(){
           suggestedOrder = (ohNum <= parNum) ? 1 : 0;
         } else if(item.item==='Saltine Crackers' && !isNaN(parNum) && parNum>0){
           suggestedOrder = ((ohNum/parNum) <= 0.5) ? 1 : 0;
+        } else if(item.item==='Toilet Paper' && !isNaN(parNum) && parNum>0){
+          suggestedOrder = ((ohNum/parNum) <= 0.5) ? 1 : 0;
+        } else if((item.item==='Dessert - Brownies' || item.item==='Dessert - Cookies') && !isNaN(parNum) && parNum>0){
+          suggestedOrder = ((ohNum/parNum) <= 0.5) ? 1 : 0;
         }
         if(suggestedOrder!==null){
           setC(v2, item, 'order', String(suggestedOrder));
@@ -3417,7 +3423,7 @@ function showCount(){
       // Auto-populate Order for GFS/Marlin at Westmont only — original rule, untouched for Marlin.
       // Rule: if On Hand is at or below 25% of Par, order enough to bring it back up to Par (rounded to a whole unit).
       // Skips the 3 GFS case-only items above, plus GFS's Croutons/Saltine Crackers (always-1-case). Marlin is unaffected.
-      const WM_GFS_ALWAYS_ONE_CASE = new Set(['Croutons','Saltine Crackers']);
+      const WM_GFS_ALWAYS_ONE_CASE = new Set(['Croutons','Saltine Crackers','Toilet Paper','Dessert - Brownies','Dessert - Cookies']);
       if(f==='oh' && currentLoc==='westmont' && ['gfs','marlin'].includes(v2) && input.value!=='' && !WM_GFS_CASES_ONLY_ITEMS.has(item.item) && !WM_GFS_ALWAYS_ONE_CASE.has(item.item)){
         const parNum = parseFloat(item.par);
         if(!isNaN(parNum) && parNum>0){
