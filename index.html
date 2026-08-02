@@ -260,7 +260,7 @@ const DATA = {
     {loc:"Expo",item:"Ind Packet - Mayo",num:"—",par:"0"},
     {loc:"Expo",item:"Ind Packet - Mustard",num:"—",par:"0"},
     {loc:"Expo",item:"Lid - Half",num:"702005",par:"30"},
-    {loc:"Expo",item:"Lid - XL",num:"702000",par:"30"},
+    {loc:"Expo",item:"Lid - XL",num:"702002",par:"30"},
     {loc:"Expo",item:"Potatoes",num:"60723",par:"1 case"},
     {loc:"Server",item:"Milk (2%)",num:"10312",par:"1 gallon"},
     {loc:"Server",item:"Powder Sugar",num:"50583",par:"1 box"},
@@ -762,7 +762,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '10.5';
+const APP_VERSION = '10.6';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -930,6 +930,7 @@ function showLogin(){
         <button class="B B-outline" style="flex:1;" id="bSwitchLoc">⇄ Switch Location</button>
         <button class="B B-outline" style="flex:1;" id="bAddonLogBtn">📋 Add-Ons Log</button>
       </div>
+      <button class="B B-outline" style="width:100%;max-width:320px;margin-top:8px;" id="bPrintTodayBtn">🖨 Print Today's Orders</button>
     </div>`;
 
 
@@ -958,6 +959,7 @@ function showLogin(){
   document.getElementById('bSwitchLoc')?.addEventListener('click',()=>{ currentLoc=null; VENDORS=null; showLogin(); });
   document.getElementById('bAddonLogBtn')?.addEventListener('click',()=>{ showAddonLog(); });
   document.getElementById('bFlagIssueBtn')?.addEventListener('click',()=>{ showIssueNote(); });
+  document.getElementById('bPrintTodayBtn')?.addEventListener('click',()=>{ showPrintTodayScreen(); });
   document.querySelectorAll('.LCard[data-vk]').forEach(el=>{
     el.onclick=()=>{
       activeVendor=el.dataset.vk;
@@ -2649,6 +2651,50 @@ function showDashOrderView(vendorName, entry){
   );
 }
 
+function showPrintTodayScreen(){
+  const todayISO = localISO(new Date());
+  const completedTodayVks = Object.keys(completed).filter(vk=>{
+    if(!completed[vk]) return false;
+    return localISO(new Date(completed[vk])) === todayISO;
+  });
+
+  const rows = completedTodayVks.map(vk=>({vk, name: vdef(vk).name})).sort((a,b)=>a.name.localeCompare(b.name));
+
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Today's Orders</div>
+      <div class="H-right"><button class="B B-ghost" id="bPrintTodayClose">✕ Close</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Orders Completed Today</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">${rows.length===0?'Nothing completed yet today.':'Print everything at once, or pick one vendor.'}</div>
+
+      ${rows.length>0 ? `<button class="B B-red B-lg" style="width:100%;margin-bottom:16px;" id="bPrintAllToday">🖨 Print All (${rows.length})</button>` : ''}
+
+      <div class="LocBlock">
+        ${rows.length===0 ? `<div style="padding:16px;color:#777;">No completed orders yet today.</div>` :
+          rows.map(r=>`
+            <div class="ProdRow" data-printvk="${r.vk}" style="cursor:pointer;">
+              <div class="ProdRow-info"><div class="ProdRow-name">${r.name}</div></div>
+              <button class="B B-outline" style="font-size:12px;" data-printonevk="${r.vk}">🖨 Print</button>
+            </div>`).join('')}
+      </div>
+    </div>`;
+
+  document.getElementById('bPrintTodayClose').onclick = ()=>showLogin();
+
+  document.querySelectorAll('[data-printonevk]').forEach(btn=>{
+    btn.onclick = (e)=>{
+      e.stopPropagation();
+      doPrint(btn.dataset.printonevk, 'orderonly');
+    };
+  });
+
+  document.getElementById('bPrintAllToday')?.addEventListener('click', ()=>{
+    completedTodayVks.forEach(vk=>doPrint(vk, 'orderonly'));
+  });
+}
+
 function showIssueNote(){
   const vendorName = activeVendor ? (vdef(activeVendor)?.name || activeVendor) : '';
   const locName = activeVendor ? (openLocs[activeVendor] || '') : '';
@@ -3571,14 +3617,7 @@ function doPrint(vk, mode){
         });
         if(items.length===0) return; // skip empty locations entirely
       }
-      tableRows+=`<tr><td colspan="5" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">${loc}</td></tr>
-      <tr>
-        <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:40%;border-right:1px solid #8B0000;">Item</td>
-        <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:18%;border-right:1px solid #8B0000;">#</td>
-        <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:12%;text-align:center;border-right:1px solid #8B0000;">Par</td>
-        <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:15%;border-right:1px solid #8B0000;">On Hand</td>
-        <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:15%;">Order</td>
-      </tr>`;
+      tableRows+=`<tr><td colspan="5" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">${loc}</td></tr>`;
       items.forEach(item=>{
         const oh=mode==='blank'?'':getC(vk,item,'oh');
         const or=mode==='blank'?'':getC(vk,item,'order');
@@ -3603,12 +3642,7 @@ function doPrint(vk, mode){
         });
         if(items.length===0) return; // skip empty locations entirely
       }
-      tableRows+=`<tr style="page-break-after:avoid;page-break-inside:avoid;"><td colspan="3" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">${loc}</td></tr>
-      <tr style="page-break-inside:avoid;">
-        <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:55%;border-right:1px solid #8B0000;">Item</td>
-        <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:25%;border-right:1px solid #8B0000;">#</td>
-        <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:20%;">Order</td>
-      </tr>`;
+      tableRows+=`<tr style="page-break-after:avoid;page-break-inside:avoid;"><td colspan="3" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">${loc}</td></tr>`;
       items.forEach(item=>{
         const oh=mode==='blank'?'':getC(vk,item,'oh');
         const or=mode==='blank'?'':getC(vk,item,'order');
@@ -3624,14 +3658,7 @@ function doPrint(vk, mode){
   if(currentLoc==='darien'){
   // Add-ons section on print
   if(mode!=='blank' && addons[vk] && addons[vk].length>0){
-    tableRows+=`<tr><td colspan="5" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">ADD-ONS</td></tr>
-    <tr>
-      <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:40%;border-right:1px solid #8B0000;">Item</td>
-      <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:18%;border-right:1px solid #8B0000;">#</td>
-      <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:12%;text-align:center;border-right:1px solid #8B0000;">Par</td>
-      <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:15%;border-right:1px solid #8B0000;">On Hand</td>
-      <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:15%;">Order</td>
-    </tr>`;
+    tableRows+=`<tr><td colspan="5" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">ADD-ONS</td></tr>`;
     addons[vk].forEach(a=>{
       tableRows+=`<tr>
         <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;font-family:'Inter',system-ui,sans-serif;">${a.name}</td>
@@ -3645,12 +3672,7 @@ function doPrint(vk, mode){
   } else {
   // Add-ons section on print
   if(mode!=='blank' && addons[vk] && addons[vk].length>0){
-    tableRows+=`<tr><td colspan="3" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">ADD-ONS</td></tr>
-    <tr>
-      <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:55%;border-right:1px solid #8B0000;">Item</td>
-      <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:25%;border-right:1px solid #8B0000;">#</td>
-      <td style="background:#A50E1F;color:#fff;font-weight:700;padding:3px 8px;font-size:9px;text-transform:uppercase;width:20%;">Order</td>
-    </tr>`;
+    tableRows+=`<tr><td colspan="3" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">ADD-ONS</td></tr>`;
     addons[vk].forEach(a=>{
       tableRows+=`<tr>
         <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;font-family:'Inter',system-ui,sans-serif;">${a.name}</td>
