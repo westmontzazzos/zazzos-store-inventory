@@ -762,7 +762,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '10.7';
+const APP_VERSION = '10.8';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1308,6 +1308,7 @@ function showWmCountScreen(){
         ]
       );
     } else {
+      setC(vk, bcItem, 'order', '0');
       showWmCateringScreen();
     }
   };
