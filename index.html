@@ -346,6 +346,7 @@ const DATA = {
   ]},
 
   marlin:{name:"Marlin",emoji:"🧴",sub:"Chemicals & Supplies",items:[
+    {loc:"Server",item:"Dinner Napkins",num:"—",par:"1 sleeve"},
     {loc:"Prep",item:"Film - 12x2000",num:"7304422",par:"1"},
     {loc:"Prep",item:"Film - 18x2000",num:"7304482",par:"1"},
     {loc:"Prep",item:"Foil - Pop-up",num:"FA3008",par:"1"},
@@ -762,7 +763,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '10.8';
+const APP_VERSION = '10.9';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3471,7 +3472,19 @@ function showCount(){
       // Rule: if On Hand is at or below 25% of Par, order enough to bring it back up to Par (rounded to a whole unit).
       // Skips the 3 GFS case-only items above, plus GFS's Croutons/Saltine Crackers (always-1-case). Marlin is unaffected.
       const WM_GFS_ALWAYS_ONE_CASE = new Set(['Croutons','Saltine Crackers','Toilet Paper','Dessert - Brownies','Dessert - Cookies']);
-      if(f==='oh' && currentLoc==='westmont' && ['gfs','marlin'].includes(v2) && input.value!=='' && !WM_GFS_CASES_ONLY_ITEMS.has(item.item) && !WM_GFS_ALWAYS_ONE_CASE.has(item.item)){
+      // Marlin: Dinner Napkins ordered by the case — less than 1 sleeve on hand triggers 1 case
+      if(f==='oh' && currentLoc==='westmont' && v2==='marlin' && item.item==='Dinner Napkins' && input.value!==''){
+        const ohNum = parseFloat(input.value)||0;
+        const suggestedOrder = (ohNum < 1) ? 1 : 0;
+        setC(v2, item, 'order', String(suggestedOrder));
+        const orderInput = allInputs.find(x=>x.dataset.vk===v2 && x.dataset.loc===loc && x.dataset.idx===idx && x.dataset.f==='order');
+        if(orderInput){
+          orderInput.value = suggestedOrder;
+          orderInput.classList.toggle('filled', suggestedOrder>0);
+        }
+      }
+
+      if(f==='oh' && currentLoc==='westmont' && ['gfs','marlin'].includes(v2) && input.value!=='' && !WM_GFS_CASES_ONLY_ITEMS.has(item.item) && !WM_GFS_ALWAYS_ONE_CASE.has(item.item) && item.item!=='Dinner Napkins'){
         const parNum = parseFloat(item.par);
         if(!isNaN(parNum) && parNum>0){
           const ohNum = parseFloat(input.value)||0;
