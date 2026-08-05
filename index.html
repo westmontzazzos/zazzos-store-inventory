@@ -289,8 +289,8 @@ const DATA = {
   ]},
 
   gfs:{name:"GFS",emoji:"🥗",sub:"Food Service",items:[
-    {loc:"Cooler",item:"Angus Burgers",num:"—",par:"2 cases"},
-    {loc:"Freezer",item:"Cod",num:"—",par:"2 bags"},
+    {loc:"WIC",item:"Angus Burgers",num:"—",par:"2 cases"},
+    {loc:"Sautee Fzr",item:"Cod",num:"—",par:"2 bags"},
     {loc:"WIF",item:"Bavarian Pretzel",num:"794822",par:"1 case"},
     {loc:"WIF",item:"Bosco Sticks",num:"432180",par:"1 case"},
     {loc:"WIF",item:"Chx - 4oz Precooked",num:"460752",par:"4 cases"},
@@ -601,6 +601,8 @@ const DATA = {
   ]},
 
   gfs:{name:"GFS",emoji:"🥗",sub:"Food Service",items:[
+    {loc:"WIC",item:"Angus Burgers",num:"—",par:"2 cases"},
+    {loc:"Stand Alone Fzr",item:"Cod",num:"—",par:"2 bags"},
     {loc:"Frozen",item:"Brownies Case",num:"—",par:"2"},
     {loc:"Frozen",item:"Blue Cheese Crumble",num:"—",par:"2"},
     {loc:"Frozen",item:"Shredded Cheddar (4/1)",num:"—",par:"2"},
@@ -764,7 +766,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '11.1';
+const APP_VERSION = '11.3';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2965,7 +2967,7 @@ function showCount(){
       const prevDone = !SEQ() || items.slice(0,idx).every(p=>getC(vk,p,'oh')!=='' && getC(vk,p,'order')!=='');
       const missingNum = item.num==='—' || item.num==='' || item.num==='WESTMONT';
       const displayPar = (vk.startsWith('bread') && item[breadParFieldFor(vk)]!==undefined) ? item[breadParFieldFor(vk)] : item.par;
-      const WM_MANUAL_CASE_SIZES = { 'Gloves':10, 'Dough - Yeast':12, 'Square Cont (18oz)':4, 'Square Lid (18oz)':4 };
+      const WM_MANUAL_CASE_SIZES = { 'Gloves':10, 'Dough - Yeast':12, 'Square Cont (18oz)':4, 'Square Lid (18oz)':4, 'Beef - Ground':'60 lbs', 'Beef - Insides':'3 chunks' };
       let wmCaseHint = '';
       if(currentLoc==='westmont' && vk==='greco' && WM_CASE_RULE_ITEMS_TOP[item.item]!==undefined){
         const upc = WM_CASE_RULE_ITEMS_TOP[item.item];
@@ -2977,8 +2979,8 @@ function showCount(){
         } else {
           wmCaseHint = ` · ${upc} units = 1 case`;
         }
-      } else if(currentLoc==='westmont' && vk==='greco' && WM_MANUAL_CASE_SIZES[item.item]!==undefined){
-        wmCaseHint = ` · ${WM_MANUAL_CASE_SIZES[item.item]} units = 1 case`;
+      } else if(currentLoc==='westmont' && ['greco','gfs'].includes(vk) && WM_MANUAL_CASE_SIZES[item.item]!==undefined){
+        wmCaseHint = ` · 1 case = ${WM_MANUAL_CASE_SIZES[item.item]}`;
       }
       const meta = (item.num!=='—'?'#'+item.num+' · ':'')+'PAR: '+displayPar+wmCaseHint;
       const nameStyle = missingNum ? 'background:#FFF59D;border-radius:3px;padding:0 3px;display:inline-block;' : '';
