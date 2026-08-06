@@ -766,7 +766,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '11.3';
+const APP_VERSION = '11.4';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2295,6 +2295,7 @@ async function showOrderHistory(){
         <button class="B B-outline" style="flex:1;padding:8px 4px;font-size:12px;" data-hvendor="GFS">GFS</button>
         <button class="B B-outline" style="flex:1;padding:8px 4px;font-size:12px;" data-hvendor="Marlin">Marlin</button>
         <button class="B B-outline" style="flex:1;padding:8px 4px;font-size:12px;" data-hvendor="Coke">Coke</button>
+        <button class="B B-outline" style="flex:1;padding:8px 4px;font-size:12px;" data-hvendor="Bread">Bread</button>
       </div>
       <div id="histResults" style="color:#777;font-style:italic;text-align:center;padding:20px;">Loading recent orders…</div>
     </div>`;
@@ -2332,7 +2333,8 @@ async function showOrderHistory(){
     try{
       let url='inventory_orders?select=*&order=created_at.desc&limit=1000';
       if(storeFilter) url+='&store=eq.'+storeFilter;
-      if(vendorFilter) url+='&vendor=eq.'+vendorFilter;
+      if(vendorFilter==='Bread') url+='&vendor=ilike.*Bread*';
+      else if(vendorFilter) url+='&vendor=eq.'+vendorFilter;
       const res=await supa(url);
       const rows=await res.json();
       if(!Array.isArray(rows)||rows.length===0){ out.innerHTML='No orders logged yet.'; return; }
@@ -2357,7 +2359,7 @@ async function showOrderHistory(){
               <strong style="font-size:14px;">${b.store.charAt(0).toUpperCase()+b.store.slice(1)} · ${b.vendor}</strong>
               <span style="color:#C8102E;font-weight:700;font-size:13px;text-decoration:underline;">${b.lines} items</span>
             </div>
-            <div style="font-size:12px;color:#777;margin-top:3px;">${b.date||'—'} · ${b.by||'—'} · total qty ${b.qty}</div>
+            <div style="font-size:12px;color:#777;margin-top:3px;">Completed ${new Date(b.created).toLocaleString('en-US',{month:'2-digit',day:'2-digit',year:'2-digit',hour:'numeric',minute:'2-digit'})} · Order date ${b.date||'—'} · ${b.by||'—'} · total qty ${b.qty}</div>
           </div>`).join('')}
         <div style="font-size:11px;color:#999;text-align:center;padding:8px;">Search an item above for totals & averages.</div>`;
 
@@ -2388,7 +2390,8 @@ async function showOrderHistory(){
     try{
       let url='inventory_orders?select=*&order=order_date.desc&limit=2000&item=ilike.'+encodeURIComponent('*'+q+'*');
       if(storeFilter) url+='&store=eq.'+storeFilter;
-      if(vendorFilter) url+='&vendor=eq.'+vendorFilter;
+      if(vendorFilter==='Bread') url+='&vendor=ilike.*Bread*';
+      else if(vendorFilter) url+='&vendor=eq.'+vendorFilter;
       const res=await supa(url,{headers:{'Prefer':'count=exact'}});
       const rows=await res.json();
       if(!Array.isArray(rows)||rows.length===0){ out.innerHTML='No orders found for "'+q+'".'; return; }
