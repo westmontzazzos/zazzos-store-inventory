@@ -766,7 +766,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '11.4';
+const APP_VERSION = '11.5';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1695,14 +1695,15 @@ function showDarienBreadCountScreen(){
     </header>
     <div class="Page" style="margin-top:76px;">
       <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Cooler, Line &amp; Breadcrumbs</div>
-      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Enter On Hand</div>
-      <div style="font-size:13px;color:#777;margin-bottom:18px;">Count what's in the Cooler and on the Line. Breadcrumbs is estimated as a decimal (see below).</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Enter On Hand &amp; Order</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Count what's in the Cooler and on the Line, then fill in what you need to order. Breadcrumbs is estimated as a decimal (see below).</div>
 
       ${['Cooler','Line'].map(loc=>`
         <div class="LocBlock" style="margin-bottom:14px;">
           <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#1B6B3A;text-transform:uppercase;letter-spacing:.04em;">${loc}</div>
           ${items.filter(i=>i.loc===loc && i.item!=='Bread Crumbs').map(item=>{
             const val = getC(vk, item, 'oh');
+            const orderVal = getC(vk, item, 'order');
             const par = item[parField];
             return `<div class="ProdRow">
               <div class="ProdRow-info">
@@ -1714,6 +1715,10 @@ function showDarienBreadCountScreen(){
                   <input class="SI${val!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
                     data-darienoh="${loc}|${item.item}" value="${val}" placeholder="0">
                 </div>
+                <div class="IG"><label>Order</label>
+                  <input class="SI${orderVal!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
+                    data-darienorder="${loc}|${item.item}" value="${orderVal}" placeholder="0">
+                </div>
               </div>
             </div>`;
           }).join('')}
@@ -1724,15 +1729,20 @@ function showDarienBreadCountScreen(){
         ${(()=>{
           const bcItem = items.find(i=>i.item==='Bread Crumbs');
           const val = getC(vk, bcItem, 'oh');
+          const orderVal = getC(vk, bcItem, 'order');
           return `<div class="ProdRow">
             <div class="ProdRow-info">
               <div class="ProdRow-name">Bread Crumbs</div>
-              <div class="ProdRow-meta">PAR: ${bcItem[parField]} bucket · enter as a decimal (0.25 = quarter full)</div>
+              <div class="ProdRow-meta">PAR: ${bcItem[parField]} bucket · enter On Hand as a decimal (0.25 = quarter full)</div>
             </div>
             <div class="DualInput">
               <div class="IG"><label>On Hand</label>
                 <input class="SI${val!==''?' filled':''}" type="number" min="0" max="1" step="any" inputmode="decimal"
                   data-darienbc="1" value="${val}" placeholder="0.5">
+              </div>
+              <div class="IG"><label>Order</label>
+                <input class="SI${orderVal!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
+                  data-darienorder="Cooler|Bread Crumbs" value="${orderVal}" placeholder="0">
               </div>
             </div>
           </div>`;
@@ -1754,6 +1764,15 @@ function showDarienBreadCountScreen(){
     };
   });
 
+  document.querySelectorAll('[data-darienorder]').forEach(inp=>{
+    inp.oninput = ()=>{
+      const [loc,name] = inp.dataset.darienorder.split('|');
+      const item = items.find(i=>i.loc===loc && i.item===name);
+      setC(vk, item, 'order', inp.value);
+      inp.classList.toggle('filled', inp.value!=='');
+    };
+  });
+
   const bcInput = document.querySelector('[data-darienbc]');
   bcInput.oninput = ()=>{
     const bcItem = items.find(i=>i.item==='Bread Crumbs');
@@ -1769,19 +1788,6 @@ function showDarienBreadCountScreen(){
   document.getElementById('bDarienBreadNext').onclick = ()=>{
     const missing = items.some(item => getC(vk, item, 'oh')==='');
     if(missing){ showModal('Missing Counts','Please enter On Hand for every item.',[{l:'OK',c:'B-red',fn:closeModal}]); return; }
-
-    // Fill each item's Order = today's/this-delivery's par minus On Hand, floored at 0
-    items.forEach(item=>{
-      if(item.item==='Bread Crumbs'){
-        const bcOnHand = Number(getC(vk, item, 'oh')) || 0;
-        const bcPar = Number(item[parField]) || 1;
-        setC(vk, item, 'order', (bcOnHand <= 0.25) ? String(bcPar) : '0');
-      } else {
-        const oh = Number(getC(vk, item, 'oh')) || 0;
-        const par = Number(item[parField]) || 0;
-        setC(vk, item, 'order', String(Math.max(0, par - oh)));
-      }
-    });
 
     showDarienBreadConfirmScreen();
   };
