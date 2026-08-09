@@ -766,7 +766,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '12.2';
+const APP_VERSION = '12.3';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2198,7 +2198,8 @@ async function pushOrderToSupabase(vk){
     const rows=[];
     vdef(vk).items.forEach(item=>{
       const or=getC(vk,item,'order');
-      if(or!=='' && or!=='0'){
+      const oh=getC(vk,item,'oh');
+      if(oh!==''){
         rows.push({
           batch_id: batch,
           store: currentLoc,
@@ -2206,7 +2207,7 @@ async function pushOrderToSupabase(vk){
           item: item.item,
           item_num: item.num,
           qty: parseFloat(or)||0,
-          on_hand: parseFloat(getC(vk,item,'oh'))||0,
+          on_hand: parseFloat(oh)||0,
           counted_by: sessionUser||'',
           order_date: usToISO(currentDate),
           delivery_date: usToISO(deliveryDate)
@@ -2247,7 +2248,8 @@ async function logOrderToCloud(vk, mode){
     const rows=[];
     vdef(vk).items.forEach(item=>{
       const or=getC(vk,item,'order');
-      if(or!=='' && or!=='0'){
+      const oh=getC(vk,item,'oh');
+      if(oh!==''){
         rows.push({
           batch_id: batch,
           store: currentLoc,
@@ -2255,7 +2257,7 @@ async function logOrderToCloud(vk, mode){
           item: item.item,
           item_num: item.num,
           qty: parseFloat(or)||0,
-          on_hand: parseFloat(getC(vk,item,'oh'))||0,
+          on_hand: parseFloat(oh)||0,
           counted_by: sessionUser||'',
           order_date: usToISO(currentDate),
           delivery_date: usToISO(deliveryDate)
