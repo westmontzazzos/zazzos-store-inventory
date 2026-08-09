@@ -766,7 +766,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '11.5';
+const APP_VERSION = '11.6';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2379,7 +2379,10 @@ async function showOrderHistory(){
               <div style="color:#777;margin-bottom:8px;">Counted by ${b.by||'—'} · Total qty ${b.qty}</div>
               ${b.items.map(i=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F0F0F0;"><span>${i.item}</span><strong style="color:#C8102E;">×${i.qty}</strong></div>`).join('')}
             </div>`,
-            [{l:'Close',c:'B-red',fn:closeModal}]
+            [
+              {l:'🖨 Print', c:'B-outline', fn:()=>{ closeModal(); printHistoricalOrder(b); }},
+              {l:'Close', c:'B-red', fn:closeModal}
+            ]
           );
         };
       });
@@ -3625,6 +3628,37 @@ function showPrintChoice(vk){
       {l:'Order Only',c:'B-red',fn:()=>{ closeModal(); doPrint(vk,'orderonly'); }}
     ]
   );
+}
+
+function printHistoricalOrder(b){
+  const storeLabel = b.store.charAt(0).toUpperCase()+b.store.slice(1);
+  const rows = b.items.map(i=>`
+    <tr>
+      <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;font-family:'Inter',system-ui,sans-serif;">${i.item}</td>
+      <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;text-align:center;font-weight:700;color:#C8102E;font-family:'Inter',system-ui,sans-serif;">${i.qty}</td>
+    </tr>`).join('');
+
+  document.getElementById('print-area').innerHTML = `
+    <div style="font-family:'Inter',system-ui,sans-serif;font-size:9px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1A1A2E;padding-bottom:4px;margin-bottom:6px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:0.05em;font-family:'Libre Baskerville',Georgia,serif;">ZAZZO'S ${storeLabel.toUpperCase()} INVENTORY</div>
+          <div style="font-size:8px;font-weight:700;text-transform:uppercase;color:#333;margin-top:2px;letter-spacing:0.06em;">${b.vendor} — REPRINT</div>
+        </div>
+        <div style="text-align:right;font-size:8px;color:#555;line-height:1.7;">
+          <div>Order Date: ${b.date||'—'}</div>
+          <div>Counted by: ${b.by||'—'}</div>
+          <div>Completed: ${new Date(b.created).toLocaleString()}</div>
+        </div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed;">
+        <tbody>
+          <tr><td colspan="2" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">Order</td></tr>
+          ${rows}
+        </tbody>
+      </table>
+    </div>`;
+  window.print();
 }
 
 function doPrint(vk, mode){
