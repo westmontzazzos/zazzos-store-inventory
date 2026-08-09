@@ -766,7 +766,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '11.8';
+const APP_VERSION = '11.9';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3635,36 +3635,61 @@ function printHistoricalOrder(b){
   const vk = Object.keys(VENDORS).find(k=>VENDORS[k].name===b.vendor) || Object.keys(VENDORS).find(k=>b.vendor.startsWith(VENDORS[k].name));
   const isDarien = b.store==='darien';
 
-  function findPar(itemName){
-    if(!vk) return '—';
-    const found = VENDORS[vk].items.find(i=>i.item===itemName);
-    return found ? found.par : '—';
+  function findItemDef(itemName){
+    if(!vk) return null;
+    return VENDORS[vk].items.find(i=>i.item===itemName) || null;
   }
 
-  let tableRows;
-  if(isDarien){
-    tableRows = b.items.map(i=>{
-      const par = findPar(i.item.replace('[ADD-ON] ',''));
-      const oh = i.onHand!==null && i.onHand!==undefined ? i.onHand : '—';
-      return `<tr>
-        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;font-family:'Inter',system-ui,sans-serif;">${i.item}</td>
-        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;color:#555;font-family:'Inter',system-ui,sans-serif;">${i.num||'—'}</td>
-        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;color:#555;text-align:center;font-family:'Inter',system-ui,sans-serif;">${par}</td>
-        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;text-align:center;font-family:'Inter',system-ui,sans-serif;">${oh}</td>
-        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;text-align:center;font-weight:700;color:#C8102E;font-family:'Inter',system-ui,sans-serif;">${i.qty}</td>
-      </tr>`;
-    }).join('');
-    tableRows = `<tr><td colspan="5" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">${b.vendor}</td></tr>` + tableRows;
-  } else {
-    tableRows = b.items.map(i=>{
-      const par = findPar(i.item.replace('[ADD-ON] ',''));
-      return `<tr>
-        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;font-family:'Inter',system-ui,sans-serif;">${i.item}</td>
-        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;color:#555;font-family:'Inter',system-ui,sans-serif;">${i.num||'—'}</td>
-        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;text-align:center;font-weight:700;color:#C8102E;font-family:'Inter',system-ui,sans-serif;">${i.qty}</td>
-      </tr>`;
-    }).join('');
-    tableRows = `<tr><td colspan="3" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">${b.vendor}</td></tr>` + tableRows;
+  // Group items by their real location, in the same order locations first appear in VENDORS,
+  // so the sheet reads section-by-section exactly like the live print does.
+  const locOrder = vk ? [...new Set(VENDORS[vk].items.map(i=>i.loc))] : [];
+  const byLoc = {};
+  const unmatched = []; // add-ons / anything we can't map to a known location
+  b.items.forEach(i=>{
+    const cleanName = i.item.replace('[ADD-ON] ','');
+    const def = findItemDef(cleanName);
+    const loc = (def && !i.item.startsWith('[ADD-ON]')) ? def.loc : null;
+    if(loc){
+      if(!byLoc[loc]) byLoc[loc] = [];
+      byLoc[loc].push({...i, par: def.par});
+    } else {
+      unmatched.push({...i, par: '—'});
+    }
+  });
+
+  function buildSectionRows(loc, items){
+    const colspan = isDarien ? 5 : 3;
+    let rows = `<tr><td colspan="${colspan}" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">${loc}</td></tr>`;
+    items.forEach(i=>{
+      if(isDarien){
+        const oh = i.onHand!==null && i.onHand!==undefined ? i.onHand : '—';
+        rows += `<tr>
+          <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;font-family:'Inter',system-ui,sans-serif;">${i.item}</td>
+          <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;color:#555;font-family:'Inter',system-ui,sans-serif;">${i.num||'—'}</td>
+          <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;color:#555;text-align:center;font-family:'Inter',system-ui,sans-serif;">${i.par}</td>
+          <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;text-align:center;font-family:'Inter',system-ui,sans-serif;">${oh}</td>
+          <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;text-align:center;font-weight:700;color:#C8102E;font-family:'Inter',system-ui,sans-serif;">${i.qty}</td>
+        </tr>`;
+      } else {
+        rows += `<tr>
+          <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;font-family:'Inter',system-ui,sans-serif;">${i.item}</td>
+          <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;color:#555;font-family:'Inter',system-ui,sans-serif;">${i.num||'—'}</td>
+          <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;text-align:center;font-weight:700;color:#C8102E;font-family:'Inter',system-ui,sans-serif;">${i.qty}</td>
+        </tr>`;
+      }
+    });
+    return rows;
+  }
+
+  let tableRows = '';
+  locOrder.forEach(loc=>{
+    if(byLoc[loc] && byLoc[loc].length) tableRows += buildSectionRows(loc, byLoc[loc]);
+  });
+  if(unmatched.length) tableRows += buildSectionRows('ADD-ONS', unmatched);
+
+  function findPar(itemName){
+    const def = findItemDef(itemName);
+    return def ? def.par : '—';
   }
 
   // Build the same "PAR EXCEEDED" alert section the live print shows
