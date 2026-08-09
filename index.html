@@ -766,7 +766,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '11.7';
+const APP_VERSION = '11.8';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3667,6 +3667,39 @@ function printHistoricalOrder(b){
     tableRows = `<tr><td colspan="3" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">${b.vendor}</td></tr>` + tableRows;
   }
 
+  // Build the same "PAR EXCEEDED" alert section the live print shows
+  let alertRows = '';
+  b.items.forEach(i=>{
+    const itemName = i.item.replace('[ADD-ON] ','');
+    const parRaw = findPar(itemName);
+    const parNum = parseFloat(parRaw);
+    const ohNum = parseFloat(i.onHand);
+    const orNum = parseFloat(i.qty);
+    if(!isNaN(parNum) && !isNaN(ohNum) && !isNaN(orNum) && (ohNum+orNum) > parNum){
+      alertRows += `<tr>
+        <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;">${itemName}</td>
+        <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;">${parRaw}</td>
+        <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;">${ohNum}</td>
+        <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;">${orNum}</td>
+        <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;font-weight:700;color:#C8102E;">${ohNum+orNum}</td>
+      </tr>`;
+    }
+  });
+  const alertHTML = alertRows ? `
+    <div style="margin-top:14px;page-break-inside:avoid;">
+      <div style="background:#C8102E;color:#fff;font-weight:700;padding:5px 8px;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;border:2px solid #8B0000;">⚠ PAR EXCEEDED — REVIEW THESE ITEMS</div>
+      <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+        <tr>
+          <td style="background:#FDECEA;font-weight:700;padding:3px 8px;font-size:8px;text-transform:uppercase;width:40%;border:1px solid #E8B4B4;">Item</td>
+          <td style="background:#FDECEA;font-weight:700;padding:3px 8px;font-size:8px;text-transform:uppercase;width:15%;text-align:center;border:1px solid #E8B4B4;">Par</td>
+          <td style="background:#FDECEA;font-weight:700;padding:3px 8px;font-size:8px;text-transform:uppercase;width:15%;text-align:center;border:1px solid #E8B4B4;">On Hand</td>
+          <td style="background:#FDECEA;font-weight:700;padding:3px 8px;font-size:8px;text-transform:uppercase;width:15%;text-align:center;border:1px solid #E8B4B4;">Order</td>
+          <td style="background:#FDECEA;font-weight:700;padding:3px 8px;font-size:8px;text-transform:uppercase;width:15%;text-align:center;border:1px solid #E8B4B4;">Total</td>
+        </tr>
+        ${alertRows}
+      </table>
+    </div>` : '';
+
   document.getElementById('print-area').innerHTML = `
     <div style="font-family:'Inter',system-ui,sans-serif;font-size:9px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1A1A2E;padding-bottom:4px;margin-bottom:6px;">
@@ -3683,6 +3716,7 @@ function printHistoricalOrder(b){
       <table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed;">
         <tbody>${tableRows}</tbody>
       </table>
+      ${alertHTML}
     </div>`;
   window.print();
 }
