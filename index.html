@@ -766,7 +766,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '12.1';
+const APP_VERSION = '12.2';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3624,8 +3624,8 @@ function showPrintChoice(vk){
   showModal('Print Order',
     'Choose what to print for '+vdef(vk).name+'.',
     [
-      {l:'Full Sheet',c:'B-outline',fn:()=>{ closeModal(); doPrint(vk,'full'); }},
-      {l:'Order Only',c:'B-red',fn:()=>{ closeModal(); doPrint(vk,'orderonly'); }}
+      {l:'Complete List',c:'B-outline',fn:()=>{ closeModal(); doPrint(vk,'full'); }},
+      {l:'Ordered',c:'B-red',fn:()=>{ closeModal(); doPrint(vk,'orderonly'); }}
     ]
   );
 }
