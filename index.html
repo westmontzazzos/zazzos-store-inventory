@@ -766,7 +766,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '11.6';
+const APP_VERSION = '11.7';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2351,7 +2351,7 @@ async function showOrderHistory(){
         if(!batches[r.batch_id]) batches[r.batch_id]={store:r.store,vendor:r.vendor,date:r.order_date,by:r.counted_by,lines:0,qty:0,created:r.created_at,items:[]};
         batches[r.batch_id].lines++;
         batches[r.batch_id].qty+=(+r.qty||0);
-        batches[r.batch_id].items.push({item:r.item, qty:r.qty});
+        batches[r.batch_id].items.push({item:r.item, qty:r.qty, onHand:r.on_hand, num:r.item_num});
       });
       const list=Object.values(batches).sort((a,b)=>b.created<a.created?-1:1);
       window.zazHistBatches = batches; // stash for tap handler below
@@ -3632,11 +3632,40 @@ function showPrintChoice(vk){
 
 function printHistoricalOrder(b){
   const storeLabel = b.store.charAt(0).toUpperCase()+b.store.slice(1);
-  const rows = b.items.map(i=>`
-    <tr>
-      <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;font-family:'Inter',system-ui,sans-serif;">${i.item}</td>
-      <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;text-align:center;font-weight:700;color:#C8102E;font-family:'Inter',system-ui,sans-serif;">${i.qty}</td>
-    </tr>`).join('');
+  const vk = Object.keys(VENDORS).find(k=>VENDORS[k].name===b.vendor) || Object.keys(VENDORS).find(k=>b.vendor.startsWith(VENDORS[k].name));
+  const isDarien = b.store==='darien';
+
+  function findPar(itemName){
+    if(!vk) return '—';
+    const found = VENDORS[vk].items.find(i=>i.item===itemName);
+    return found ? found.par : '—';
+  }
+
+  let tableRows;
+  if(isDarien){
+    tableRows = b.items.map(i=>{
+      const par = findPar(i.item.replace('[ADD-ON] ',''));
+      const oh = i.onHand!==null && i.onHand!==undefined ? i.onHand : '—';
+      return `<tr>
+        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;font-family:'Inter',system-ui,sans-serif;">${i.item}</td>
+        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;color:#555;font-family:'Inter',system-ui,sans-serif;">${i.num||'—'}</td>
+        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;color:#555;text-align:center;font-family:'Inter',system-ui,sans-serif;">${par}</td>
+        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;text-align:center;font-family:'Inter',system-ui,sans-serif;">${oh}</td>
+        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;text-align:center;font-weight:700;color:#C8102E;font-family:'Inter',system-ui,sans-serif;">${i.qty}</td>
+      </tr>`;
+    }).join('');
+    tableRows = `<tr><td colspan="5" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">${b.vendor}</td></tr>` + tableRows;
+  } else {
+    tableRows = b.items.map(i=>{
+      const par = findPar(i.item.replace('[ADD-ON] ',''));
+      return `<tr>
+        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;font-family:'Inter',system-ui,sans-serif;">${i.item}</td>
+        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;color:#555;font-family:'Inter',system-ui,sans-serif;">${i.num||'—'}</td>
+        <td style="padding:3px 8px;border:1px solid #DDD;font-size:9px;text-align:center;font-weight:700;color:#C8102E;font-family:'Inter',system-ui,sans-serif;">${i.qty}</td>
+      </tr>`;
+    }).join('');
+    tableRows = `<tr><td colspan="3" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">${b.vendor}</td></tr>` + tableRows;
+  }
 
   document.getElementById('print-area').innerHTML = `
     <div style="font-family:'Inter',system-ui,sans-serif;font-size:9px;">
@@ -3652,10 +3681,7 @@ function printHistoricalOrder(b){
         </div>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed;">
-        <tbody>
-          <tr><td colspan="2" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 8px;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;border-top:2px solid #000;border-bottom:2px solid #000;">Order</td></tr>
-          ${rows}
-        </tbody>
+        <tbody>${tableRows}</tbody>
       </table>
     </div>`;
   window.print();
