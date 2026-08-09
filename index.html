@@ -766,7 +766,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '12.3';
+const APP_VERSION = '12.4';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1011,7 +1011,7 @@ function showLogin(){
       if(!openLocs[activeVendor]) openLocs[activeVendor]=getLocs(activeVendor)[0];
       const s = sess[activeVendor];
       const goIn=()=>{
-        if(s){
+        if(s && isSessionFromToday(s)){
           sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
           showCount();
         } else {
@@ -1186,7 +1186,7 @@ function wmStartSession(vk){
     saveState();
   }
   const s = sess[vk];
-  if(s){
+  if(s && isSessionFromToday(s)){
     sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
     showWmCountScreen();
   } else {
@@ -1938,7 +1938,7 @@ function startDarienBreadOrder(tag){
     saveState();
   }
   const s = sess[vk];
-  if(s){
+  if(s && isSessionFromToday(s)){
     sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
     showDarienBreadcrumbsExplainer(null, showDarienBreadCountScreen);
   } else {
@@ -2076,6 +2076,14 @@ function localISO(d){
   // Local calendar date as YYYY-MM-DD — avoids UTC roll-over that toISOString() causes at night
   const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), day=String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${day}`;
+}
+
+// A stored session (sess[vk]) is only valid for reuse if it was actually created today.
+// Without this check, an order started yesterday and left mid-way would silently reuse
+// yesterday's date today, skipping the date-entry screen entirely.
+function isSessionFromToday(s){
+  if(!s || !s.savedOn) return false;
+  return s.savedOn === localISO(new Date());
 }
 
 // ONE-TIME REPAIR: entries logged before the UTC-rollover fix may have completionDate
@@ -2915,12 +2923,12 @@ function showDateEntry(vk, user){
       <div style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:16px;">
         <div>
           <div style="font-size:11px;font-weight:700;color:#777;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;text-align:center;">Order Date</div>
-          <input id="orderDateInput" type="date" value="${iso(today)}"
+          <input id="orderDateInput" type="date" value="${iso(today)}" min="${iso(today)}"
             style="width:100%;height:56px;border:2px solid #1B6B3A;border-radius:10px;font-size:19px;font-weight:700;text-align:center;font-family:'Inter',sans-serif;padding:0 12px;color:#111;background:#fff;-webkit-appearance:none;appearance:none;">
         </div>
         <div>
           <div style="font-size:11px;font-weight:700;color:#777;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;text-align:center;">Delivery Date</div>
-          <input id="deliveryDateInput" type="date" value="${iso(tomorrow)}"
+          <input id="deliveryDateInput" type="date" value="${iso(tomorrow)}" min="${iso(today)}"
             style="width:100%;height:56px;border:2px solid #1B6B3A;border-radius:10px;font-size:19px;font-weight:700;text-align:center;font-family:'Inter',sans-serif;padding:0 12px;color:#111;background:#fff;-webkit-appearance:none;appearance:none;">
         </div>
         <button class="B B-red B-lg" style="width:100%;" id="bConfirmDate">Confirm →</button>
@@ -2936,11 +2944,14 @@ function showDateEntry(vk, user){
     let ok = true;
     if(!od){ document.getElementById('orderDateInput').style.borderColor='#C8102E'; ok=false; }
     if(!dv){ document.getElementById('deliveryDateInput').style.borderColor='#C8102E'; ok=false; }
+    const todayISOStr = iso(today);
+    if(od && od < todayISOStr){ document.getElementById('orderDateInput').style.borderColor='#C8102E'; ok=false; showModal('Invalid Date','Order Date cannot be in the past.',[{l:'OK',c:'B-red',fn:closeModal}]); }
+    if(dv && dv < todayISOStr){ document.getElementById('deliveryDateInput').style.borderColor='#C8102E'; ok=false; showModal('Invalid Date','Delivery Date cannot be in the past.',[{l:'OK',c:'B-red',fn:closeModal}]); }
     if(!ok) return;
     currentDate = toUS(od);
     deliveryDate = toUS(dv);
     sessionUser = user;
-    sess[vk] = {user, orderDate: currentDate, deliveryDate};
+    sess[vk] = {user, orderDate: currentDate, deliveryDate, savedOn: localISO(new Date())};
     saveState();
     if(pendingBreadReview){
       pendingBreadReview = false;
