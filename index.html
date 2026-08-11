@@ -767,7 +767,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '13.0';
+const APP_VERSION = '13.1';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1116,6 +1116,13 @@ function breadParFieldForDow(dow){ return BREAD_DAYS[dow]; }
 function breadParFieldFor(vk){
   if(vk==='bread_sunday') return 'parSun';
   if(vk==='bread_monday') return 'parMon';
+  if(deliveryDate){
+    const iso = usToISO(deliveryDate);
+    if(iso){
+      const [y,m,d] = iso.split('-').map(Number);
+      return breadParFieldForDow(new Date(y, m-1, d).getDay());
+    }
+  }
   return breadParFieldForDow(new Date().getDay());
 }
 
@@ -1209,10 +1216,20 @@ const WM_ALL_COUNT_ITEMS = [
 ];
 
 // ─── STEP 1: One combined counting screen (Freezer + Breadcrumb + Line) ───────
+function wmDeliveryDow(){
+  if(deliveryDate){
+    const iso = usToISO(deliveryDate);
+    if(iso){
+      const [y,m,d] = iso.split('-').map(Number);
+      return new Date(y, m-1, d).getDay();
+    }
+  }
+  return new Date().getDay();
+}
+
 function showWmCountScreen(){
   const vk = activeVendor;
-  const today2 = new Date();
-  const dow2 = today2.getDay();
+  const dow2 = wmDeliveryDow();
   const lineDayPar = wmLineDayPar(dow2);
 
   const rows = WM_ALL_COUNT_ITEMS.map(r => {
@@ -1388,8 +1405,7 @@ function showWmCateringEntryScreen(){
 // ─── STEP 2: Standing Order vs Additional ─────────────────────────────────────
 function showWmStandingChoiceScreen(){
   const vk = activeVendor;
-  const today2 = new Date();
-  const dow2 = today2.getDay();
+  const dow2 = wmDeliveryDow();
   app.innerHTML = `
     <header class="H no-print">
       <div class="H-logo">Bread</div>
@@ -1660,6 +1676,13 @@ let pendingBreadReview = false;
 function darienBreadParFieldForVk(vk){
   if(vk==='bread_sunday') return 'parSun';
   if(vk==='bread_monday') return 'parMon';
+  if(deliveryDate){
+    const iso = usToISO(deliveryDate);
+    if(iso){
+      const [y,m,d] = iso.split('-').map(Number);
+      return BREAD_DAYS[new Date(y, m-1, d).getDay()];
+    }
+  }
   return BREAD_DAYS[new Date().getDay()];
 }
 
