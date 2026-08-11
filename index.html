@@ -767,7 +767,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '12.9';
+const APP_VERSION = '13.0';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1153,7 +1153,7 @@ const WM_CASE_RULE_ITEMS_TOP = {
 
 const WM_LINE_STANDING = {
   'Extra Longs':       {0:9, 1:6, 2:6, 3:7, 4:7, 5:11, 6:11},
-  'Sourdough Torpedo':  {0:8, 1:6, 2:6, 3:8, 4:8, 5:10, 6:10},
+  'Sourdough Torpedo':  {0:6, 1:5, 2:5, 3:7, 4:7, 5:9, 6:9},
 };
 
 function wmItem(loc, name){ return VENDORS.bread.items.find(i=>i.loc===loc && i.item===name); }
