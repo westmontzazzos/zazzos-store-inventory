@@ -368,6 +368,7 @@ const DATA = {
     {loc:"3 Comp Sink",item:"5Gal Yellow (Pots & Pans)",num:"—",par:"1 gallon"},
     {loc:"3 Comp Sink",item:"Floor Cleaner Packets",num:"10706",par:"1 case"},
     {loc:"3 Comp Sink",item:"Tape - Single Ply Green",num:"—",par:"1 case"},
+    {loc:"3 Comp Sink",item:"Tape - Single Ply Yellow",num:"—",par:"1 case"},
     {loc:"3 Comp Sink",item:"Tape - Single Ply White",num:"—",par:"1 case"},
     {loc:"3 Comp Sink",item:"Tape - Thermal",num:"—",par:"1 case"},
     {loc:"Dish Pit",item:"5Gal Blue",num:"—",par:"1 gallon"},
@@ -384,7 +385,7 @@ const DATA = {
     {loc:"Grill",item:"3.25oz Lids",num:"FU5052",par:"1 case"},
     {loc:"Grill",item:"3.25oz White Cups",num:"—",par:"1 case"},
     {loc:"Grill",item:"3.25oz White Lids",num:"—",par:"1 case"},
-    {loc:"Server",item:"160oz Bowl (catering)",num:"HPB12610PP.BK",par:"20 iunits"},
+    {loc:"Server",item:"160oz Bowl (catering)",num:"HPB12610PP.BK",par:"20 units"},
     {loc:"Server",item:"160oz Lid (catering)",num:"C1200C.L",par:"20 units"},
     {loc:"Server",item:"38oz Oblong & Lid",num:"FN1015",par:"2 cases"},
     {loc:"Server",item:"Napkin Wrap",num:"D826E",par:"1 box"},
@@ -766,7 +767,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '12.6';
+const APP_VERSION = '12.7';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3524,6 +3525,19 @@ function showCount(){
       if(f==='oh' && currentLoc==='westmont' && v2==='marlin' && item.item==='Dinner Napkins' && input.value!==''){
         const ohNum = parseFloat(input.value)||0;
         const suggestedOrder = (ohNum < 1) ? 1 : 0;
+        setC(v2, item, 'order', String(suggestedOrder));
+        const orderInput = allInputs.find(x=>x.dataset.vk===v2 && x.dataset.loc===loc && x.dataset.idx===idx && x.dataset.f==='order');
+        if(orderInput){
+          orderInput.value = suggestedOrder;
+          orderInput.classList.toggle('filled', suggestedOrder>0);
+        }
+      }
+
+      // Marlin: 160oz Bowl/Lid ordered by the case — at or below 25% of par (5 of 20) triggers 1 case, never the unit shortfall
+      if(f==='oh' && currentLoc==='westmont' && v2==='marlin' && (item.item==='160oz Bowl (catering)' || item.item==='160oz Lid (catering)') && input.value!==''){
+        const parNum = parseFloat(item.par);
+        const ohNum = parseFloat(input.value)||0;
+        const suggestedOrder = (!isNaN(parNum) && parNum>0 && (ohNum/parNum) <= 0.25) ? 1 : 0;
         setC(v2, item, 'order', String(suggestedOrder));
         const orderInput = allInputs.find(x=>x.dataset.vk===v2 && x.dataset.loc===loc && x.dataset.idx===idx && x.dataset.f==='order');
         if(orderInput){
