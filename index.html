@@ -767,7 +767,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '12.8';
+const APP_VERSION = '12.9';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3744,24 +3744,26 @@ function printHistoricalOrder(b){
     return def ? def.par : '—';
   }
 
-  // Build the same "PAR EXCEEDED" alert section the live print shows
+  // Build the same "PAR EXCEEDED" alert section the live print shows — Darien only
   let alertRows = '';
-  b.items.forEach(i=>{
-    const itemName = i.item.replace('[ADD-ON] ','');
-    const parRaw = findPar(itemName);
-    const parNum = parseFloat(parRaw);
-    const ohNum = parseFloat(i.onHand);
-    const orNum = parseFloat(i.qty);
-    if(!isNaN(parNum) && !isNaN(ohNum) && !isNaN(orNum) && (ohNum+orNum) > parNum){
-      alertRows += `<tr>
-        <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;">${itemName}</td>
-        <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;">${parRaw}</td>
-        <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;">${ohNum}</td>
-        <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;">${orNum}</td>
-        <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;font-weight:700;color:#C8102E;">${ohNum+orNum}</td>
-      </tr>`;
-    }
-  });
+  if(isDarien){
+    b.items.forEach(i=>{
+      const itemName = i.item.replace('[ADD-ON] ','');
+      const parRaw = findPar(itemName);
+      const parNum = parseFloat(parRaw);
+      const ohNum = parseFloat(i.onHand);
+      const orNum = parseFloat(i.qty);
+      if(!isNaN(parNum) && !isNaN(ohNum) && !isNaN(orNum) && (ohNum+orNum) > parNum){
+        alertRows += `<tr>
+          <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;">${itemName}</td>
+          <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;">${parRaw}</td>
+          <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;">${ohNum}</td>
+          <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;">${orNum}</td>
+          <td style="padding:3px 8px;border:1px solid #E8B4B4;font-size:9px;text-align:center;font-weight:700;color:#C8102E;">${ohNum+orNum}</td>
+        </tr>`;
+      }
+    });
+  }
   const alertHTML = alertRows ? `
     <div style="margin-top:14px;page-break-inside:avoid;">
       <div style="background:#C8102E;color:#fff;font-weight:700;padding:5px 8px;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;border:2px solid #8B0000;">⚠ PAR EXCEEDED — REVIEW THESE ITEMS</div>
