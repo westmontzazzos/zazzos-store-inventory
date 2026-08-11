@@ -767,7 +767,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '12.7';
+const APP_VERSION = '12.8';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1401,6 +1401,7 @@ function showWmStandingChoiceScreen(){
       <div style="font-size:13px;color:#777;margin-bottom:18px;">Standing Order locks Extra Longs and Sourdough Torpedo to today's fixed number. Additional lets you edit those, plus add more to anything else.</div>
       <div class="LocBlock" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
         <button class="B B-red B-lg" style="width:100%;" id="bWmStandYes">Standing Order</button>
+        <button class="B B-outline B-lg" style="width:100%;" id="bWmStandEdit">Edit Standing Order</button>
         <button class="B B-outline B-lg" style="width:100%;" id="bWmStandNo">Additional</button>
       </div>
     </div>`;
@@ -1412,6 +1413,9 @@ function showWmStandingChoiceScreen(){
   document.getElementById('bWmStandYes').onclick = ()=>{
     showWmBreakdownScreen('standing');
   };
+  document.getElementById('bWmStandEdit').onclick = ()=>{
+    showWmBreakdownScreen('edit-standing');
+  };
   document.getElementById('bWmStandNo').onclick = ()=>{
     showWmBreakdownScreen('additional');
   };
@@ -1420,11 +1424,12 @@ function showWmStandingChoiceScreen(){
 // ─── STEP 3: Three-column breakdown (On Hand / Needed / Additional) ──────────
 function showWmBreakdownScreen(mode){
   const vk = activeVendor;
-  const isStanding = mode==='standing';
+  const isStanding = mode==='standing' || mode==='edit-standing';
+  const isEditStanding = mode==='edit-standing';
 
   const extraItems = [
-    {loc:'Line', item:'Extra Longs', locked: isStanding},
-    {loc:'Line', item:'Sourdough Torpedo', locked: isStanding},
+    {loc:'Line', item:'Extra Longs', locked: isStanding && !isEditStanding},
+    {loc:'Line', item:'Sourdough Torpedo', locked: isStanding && !isEditStanding},
   ];
 
   // Items that can come from multiple sources — combined into one running total each
@@ -1454,8 +1459,8 @@ function showWmBreakdownScreen(mode){
     </header>
     <div class="Page" style="margin-top:76px;">
       <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Step 3 — Review &amp; Additional</div>
-      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">${isStanding?'Standing Order':'Additional Order'}</div>
-      <div style="font-size:13px;color:#777;margin-bottom:18px;">${isStanding?'Extra Longs and Sourdough Torpedo are locked to today\'s standing quantity.':'Adjust Extra Longs and Sourdough Torpedo, or add more to anything else.'}</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">${isEditStanding?'Edit Standing Order':isStanding?'Standing Order':'Additional Order'}</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">${isEditStanding?'Adjust Extra Longs and Sourdough Torpedo as needed.':isStanding?'Extra Longs and Sourdough Torpedo are locked to today\'s standing quantity.':'Adjust Extra Longs and Sourdough Torpedo, or add more to anything else.'}</div>
 
       <div class="LocBlock">
         <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#1B6B3A;text-transform:uppercase;letter-spacing:.04em;">Extra Longs &amp; Torpedo</div>
