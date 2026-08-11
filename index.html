@@ -766,7 +766,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '12.5';
+const APP_VERSION = '12.6';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2678,15 +2678,36 @@ function showDashOrderView(vendorName, entry){
   );
 }
 
-function showPrintTodayScreen(){
+async function showPrintTodayScreen(){
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Today's Orders</div>
+      <div class="H-right"><button class="B B-ghost" id="bPrintTodayClose">✕ Close</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Orders Completed Today</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Loading…</div>
+    </div>`;
+  document.getElementById('bPrintTodayClose').onclick = ()=>showLogin();
+
   const todayISO = localISO(new Date());
-  const completedTodayVks = Object.keys(completed).filter(vk=>{
-    if(!completed[vk]) return false;
-    return localISO(new Date(completed[vk])) === todayISO;
-  });
+  let rows = [];
+  try{
+    const res = await supa('inventory_orders?store=eq.'+encodeURIComponent(currentLoc)+'&select=vendor,item,qty,item_num,on_hand,counted_by,order_date,delivery_date,created_at,batch_id&order=created_at.desc&limit=2000');
+    const allRows = res.ok ? await res.json() : [];
+    const batches = {};
+    allRows.forEach(r=>{
+      if(localISO(new Date(r.created_at)) !== todayISO) return;
+      if(!batches[r.batch_id]) batches[r.batch_id]={store:currentLoc,vendor:r.vendor,date:r.order_date,by:r.counted_by,created:r.created_at,items:[]};
+      batches[r.batch_id].items.push({item:r.item, qty:r.qty, onHand:r.on_hand, num:r.item_num});
+    });
+    rows = Object.values(batches).sort((a,b)=>a.vendor.localeCompare(b.vendor));
+  }catch(e){}
 
-  const rows = completedTodayVks.map(vk=>({vk, name: vdef(vk).name})).sort((a,b)=>a.name.localeCompare(b.name));
+  showPrintTodayResults(rows);
+}
 
+function showPrintTodayResults(rows){
   app.innerHTML = `
     <header class="H no-print">
       <div class="H-logo">Today's Orders</div>
@@ -2700,25 +2721,24 @@ function showPrintTodayScreen(){
 
       <div class="LocBlock">
         ${rows.length===0 ? `<div style="padding:16px;color:#777;">No completed orders yet today.</div>` :
-          rows.map(r=>`
-            <div class="ProdRow" data-printvk="${r.vk}" style="cursor:pointer;">
-              <div class="ProdRow-info"><div class="ProdRow-name">${r.name}</div></div>
-              <button class="B B-outline" style="font-size:12px;" data-printonevk="${r.vk}">🖨 Print</button>
+          rows.map((r,i)=>`
+            <div class="ProdRow">
+              <div class="ProdRow-info"><div class="ProdRow-name">${r.vendor}</div><div class="ProdRow-meta">${r.by||'—'} · ${r.items.length} items</div></div>
+              <button class="B B-outline" style="font-size:12px;" data-printtodayidx="${i}">🖨 Print</button>
             </div>`).join('')}
       </div>
     </div>`;
 
   document.getElementById('bPrintTodayClose').onclick = ()=>showLogin();
 
-  document.querySelectorAll('[data-printonevk]').forEach(btn=>{
-    btn.onclick = (e)=>{
-      e.stopPropagation();
-      doPrint(btn.dataset.printonevk, 'orderonly');
+  document.querySelectorAll('[data-printtodayidx]').forEach(btn=>{
+    btn.onclick = ()=>{
+      printHistoricalOrder(rows[+btn.dataset.printtodayidx]);
     };
   });
 
   document.getElementById('bPrintAllToday')?.addEventListener('click', ()=>{
-    completedTodayVks.forEach(vk=>doPrint(vk, 'orderonly'));
+    rows.forEach(r=>printHistoricalOrder(r));
   });
 }
 
