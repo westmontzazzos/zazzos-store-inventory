@@ -767,7 +767,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '13.1';
+const APP_VERSION = '13.2';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -936,6 +936,7 @@ function showLogin(){
         <button class="B B-outline" style="flex:1;" id="bAddonLogBtn">📋 Add-Ons Log</button>
       </div>
       <button class="B B-outline" style="width:100%;max-width:320px;margin-top:8px;" id="bPrintTodayBtn">🖨 Print Today's Orders</button>
+      <button class="B B-outline" style="width:100%;max-width:320px;margin-top:8px;" id="bWeeklyBreadBtn">📅 Weekly Bread Summary</button>
     </div>`;
 
 
@@ -965,6 +966,7 @@ function showLogin(){
   document.getElementById('bAddonLogBtn')?.addEventListener('click',()=>{ showAddonLog(); });
   document.getElementById('bFlagIssueBtn')?.addEventListener('click',()=>{ showIssueNote(); });
   document.getElementById('bPrintTodayBtn')?.addEventListener('click',()=>{ showPrintTodayScreen(); });
+  document.getElementById('bWeeklyBreadBtn')?.addEventListener('click',()=>{ showWeeklyBreadSummary(); });
   document.querySelectorAll('.LCard[data-vk]').forEach(el=>{
     el.onclick=()=>{
       activeVendor=el.dataset.vk;
@@ -2705,6 +2707,107 @@ function showDashOrderView(vendorName, entry){
     </div>`,
     [{l:'← Back to Dashboard',c:'B-red',fn:()=>{ closeModal(); renderDashboard(); }}]
   );
+}
+
+async function showWeeklyBreadSummary(){
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Weekly Bread Summary</div>
+      <div class="H-right"><button class="B B-ghost" id="bWeeklyBreadClose">✕ Close</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">This Week's Bread Orders</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Loading…</div>
+    </div>`;
+  document.getElementById('bWeeklyBreadClose').onclick = ()=>showLogin();
+
+  const week = getWeekDates(0); // Mon..Sun
+  const weekStartISO = localISO(week[0]);
+  const weekEndISO = localISO(week[6]);
+
+  let byDay = {}; // 'YYYY-MM-DD' -> { itemName: qty }
+  try{
+    const res = await supa('inventory_orders?store=eq.'+encodeURIComponent(currentLoc)+'&vendor=ilike.*Bread*&select=item,qty,order_date,created_at&order=created_at.desc&limit=2000');
+    const rows = res.ok ? await res.json() : [];
+    rows.forEach(r=>{
+      const completedDay = localISO(new Date(r.created_at));
+      if(completedDay < weekStartISO || completedDay > weekEndISO) return;
+      if(!byDay[completedDay]) byDay[completedDay] = {};
+      // last-write-wins per item per day naturally, since rows are newest-first and we only set if unset
+      if(byDay[completedDay][r.item]===undefined) byDay[completedDay][r.item] = r.qty;
+    });
+  }catch(e){}
+
+  showWeeklyBreadResults(week, byDay);
+}
+
+function showWeeklyBreadResults(week, byDay){
+  const dayLabels = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  const lineItems = ['Extra Longs','Sourdough Torpedo','Filone','Hamburger Buns','4 Inch Rolls'];
+  const bcItem = 'Bread Crumbs';
+
+  function cellFor(dayISO, itemName){
+    const val = byDay[dayISO] && byDay[dayISO][itemName]!==undefined ? byDay[dayISO][itemName] : '';
+    return `<td style="border:1px solid #DDD;padding:4px 6px;text-align:center;font-size:11px;font-weight:700;color:${val!==''?'#C8102E':'#CCC'};">${val!==''?val:'—'}</td>`;
+  }
+
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Weekly Bread Summary</div>
+      <div class="H-right">
+        <button class="B B-ghost" id="bWeeklyBreadPrint">🖨 Print</button>
+        <button class="B B-ghost" id="bWeeklyBreadClose">✕ Close</button>
+      </div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">This Week's Bread Orders</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">${week[0].toLocaleDateString()} – ${week[6].toLocaleDateString()}</div>
+      <div id="weeklyBreadTableWrap" style="overflow-x:auto;">
+        ${buildWeeklyBreadTable(week, byDay)}
+      </div>
+    </div>`;
+
+  document.getElementById('bWeeklyBreadClose').onclick = ()=>showLogin();
+  document.getElementById('bWeeklyBreadPrint').onclick = ()=>printWeeklyBreadSummary(week, byDay);
+}
+
+function buildWeeklyBreadTable(week, byDay){
+  const dayLabels = ['MON','TUE','WED','THU','FRI','SAT','SUN'];
+  const lineItems = ['Extra Longs','Sourdough Torpedo','Filone','Hamburger Buns','4 Inch Rolls'];
+  const bcItem = 'Bread Crumbs';
+
+  function cellFor(dayISO, itemName){
+    const val = byDay[dayISO] && byDay[dayISO][itemName]!==undefined ? byDay[dayISO][itemName] : '';
+    return `<td style="border:1px solid #DDD;padding:4px 6px;text-align:center;font-size:11px;font-weight:700;color:${val!==''?'#C8102E':'#CCC'};">${val!==''?val:'—'}</td>`;
+  }
+
+  const dayISOs = week.map(d=>localISO(d));
+
+  let html = `<table style="width:100%;border-collapse:collapse;font-family:'Inter',system-ui,sans-serif;">
+    <tr><td style="background:#1A1A2E;color:#fff;font-weight:700;padding:5px 8px;font-size:11px;text-transform:uppercase;" colspan="8">Line</td></tr>
+    <tr><td style="border:1px solid #DDD;padding:4px 6px;font-size:10px;font-weight:700;background:#F5F5F5;"></td>${dayLabels.map(d=>`<td style="border:1px solid #DDD;padding:4px 6px;font-size:10px;font-weight:700;background:#F5F5F5;text-align:center;">${d}</td>`).join('')}</tr>`;
+
+  lineItems.forEach(name=>{
+    html += `<tr><td style="border:1px solid #DDD;padding:4px 6px;font-size:11px;font-weight:700;">${name}</td>${dayISOs.map(iso=>cellFor(iso,name)).join('')}</tr>`;
+  });
+
+  html += `<tr><td style="background:#1A1A2E;color:#fff;font-weight:700;padding:5px 8px;font-size:11px;text-transform:uppercase;" colspan="8">Breadcrumbs</td></tr>`;
+  html += `<tr><td style="border:1px solid #DDD;padding:4px 6px;font-size:11px;font-weight:700;">${bcItem}</td>${dayISOs.map(iso=>cellFor(iso,bcItem)).join('')}</tr>`;
+  html += `</table>`;
+  return html;
+}
+
+function printWeeklyBreadSummary(week, byDay){
+  const storeLabel = currentLoc.charAt(0).toUpperCase()+currentLoc.slice(1);
+  document.getElementById('print-area').innerHTML = `
+    <div style="font-family:'Inter',system-ui,sans-serif;font-size:10px;">
+      <div style="border-bottom:2px solid #1A1A2E;padding-bottom:4px;margin-bottom:8px;">
+        <div style="font-size:14px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:0.05em;font-family:'Libre Baskerville',Georgia,serif;">ZAZZO'S ${storeLabel.toUpperCase()} — WEEKLY BREAD SUMMARY</div>
+        <div style="font-size:9px;color:#555;margin-top:2px;">${week[0].toLocaleDateString()} – ${week[6].toLocaleDateString()}</div>
+      </div>
+      ${buildWeeklyBreadTable(week, byDay)}
+    </div>`;
+  window.print();
 }
 
 async function showPrintTodayScreen(){
