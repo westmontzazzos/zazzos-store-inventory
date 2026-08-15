@@ -767,7 +767,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '13.2';
+const APP_VERSION = '13.3';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1191,8 +1191,10 @@ function enterBreadWestmont(){
 function wmStartSession(vk){
   activeVendor = vk;
   ensureBreadAliasState(vk);
-  if(!completed[vk]){
+  const completedToday = completed[vk] && localISO(new Date(completed[vk])) === localISO(new Date());
+  if(!completedToday){
     counts[vk] = {};
+    completed[vk] = null;
     saveState();
   }
   const s = sess[vk];
