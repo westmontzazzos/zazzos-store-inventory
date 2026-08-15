@@ -767,7 +767,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '13.3';
+const APP_VERSION = '13.4';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -992,10 +992,11 @@ function showLogin(){
         } else {
           // Darien
           const todayD = new Date();
+          const breadCompletedToday = completed['bread'] && localISO(new Date(completed['bread'])) === localISO(new Date());
           if(todayD.getDay()===6){
             reviewMode=false;
             enterBread();
-          } else if(completed['bread']){
+          } else if(breadCompletedToday){
             showModal('Order Already Completed',
               'This order was marked complete. What would you like to do?',
               [
@@ -1966,8 +1967,10 @@ function startDarienBreadOrder(tag){
   const vk = 'bread'+(tag?'_'+tag:'');
   activeVendor = vk;
   ensureBreadAliasState(vk);
-  if(!completed[vk]){
+  const completedToday = completed[vk] && localISO(new Date(completed[vk])) === localISO(new Date());
+  if(!completedToday){
     counts[vk] = {};
+    completed[vk] = null;
     saveState();
   }
   const s = sess[vk];
