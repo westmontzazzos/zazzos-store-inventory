@@ -784,7 +784,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '13.7';
+const APP_VERSION = '13.8';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1188,6 +1188,31 @@ function wmItem(loc, name){ return VENDORS.bread.items.find(i=>i.loc===loc && i.
 let wmAdditional = {}; // { "loc|item": "extra qty" } — transient, folded into order on Continue
 
 function enterBreadWestmont(){
+  showWmStandardOrCountsScreen();
+}
+
+function showWmStandardOrCountsScreen(){
+  app.innerHTML = `
+    <header class="H no-print"><div class="H-logo">Bread</div></header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">How are we doing today's order?</div>
+      <div style="font-size:14px;color:#444;line-height:1.6;margin-bottom:20px;">
+        <strong>Standard Order</strong> means everything is at full par — no counting needed, nothing to order. This closes out today's Bread order immediately.<br><br>
+        <strong>Proceed with Counts</strong> goes through the normal Freezer, Line, and Breadcrumb count.
+      </div>
+      <div class="LocBlock" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+        <button class="B B-red B-lg" style="width:100%;" id="bWmStandardOrder">Standard Order</button>
+        <button class="B B-outline B-lg" style="width:100%;" id="bWmProceedCounts">Proceed with Counts</button>
+      </div>
+    </div>`;
+
+  document.getElementById('bWmProceedCounts').onclick = ()=>{ enterBreadWestmontAfterChoice(); };
+  document.getElementById('bWmStandardOrder').onclick = ()=>{ wmStandardOrderPending = true; enterBreadWestmontAfterChoice(); };
+}
+
+let wmStandardOrderPending = false;
+
+function enterBreadWestmontAfterChoice(){
   const today = new Date();
   const dow = today.getDay(); // 0=Sun..6=Sat
 
@@ -1218,10 +1243,31 @@ function wmStartSession(vk){
   const s = sess[vk];
   if(s && isSessionFromToday(s)){
     sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
-    showWmCountScreen();
+    if(wmStandardOrderPending){
+      wmStandardOrderPending = false;
+      wmApplyStandardOrder(vk);
+    } else {
+      showWmCountScreen();
+    }
   } else {
     showVerify(vk);
   }
+}
+
+function wmApplyStandardOrder(vk){
+  const dow2 = wmDeliveryDow();
+  const lineDayPar = wmLineDayPar(dow2);
+  WM_ALL_COUNT_ITEMS.forEach(r=>{
+    const par = r.par!==null ? r.par : lineDayPar;
+    const item = wmItem(r.loc, r.item);
+    if(!item) return;
+    setC(vk, item, 'oh', String(par));
+    setC(vk, item, 'order', '0');
+  });
+  // Extra Longs / Sourdough Torpedo on the Line follow today's standing numbers, always fully covered
+  setC(vk, wmItem('Line','Extra Longs'), 'order', String(WM_LINE_STANDING['Extra Longs'][dow2]));
+  setC(vk, wmItem('Line','Sourdough Torpedo'), 'order', String(WM_LINE_STANDING['Sourdough Torpedo'][dow2]));
+  showWmReviewScreen();
 }
 
 // Fixed pars
@@ -3134,7 +3180,12 @@ function showDateEntry(vk, user){
       pendingDarienBreadCount = false;
       showDarienBreadcrumbsExplainer(null, showDarienBreadCountScreen);
     } else if(vk.startsWith('bread') && currentLoc==='westmont'){
-      showWmCountScreen();
+      if(wmStandardOrderPending){
+        wmStandardOrderPending = false;
+        wmApplyStandardOrder(vk);
+      } else {
+        showWmCountScreen();
+      }
     } else {
       showCount();
     }
