@@ -784,7 +784,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '13.8';
+const APP_VERSION = '13.9';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -835,13 +835,14 @@ function applyDailyRollover(){
     // The rollover "date" is the date of the most recent 8pm threshold that has passed
     const thresholdDate = (now >= todayRolloverPoint) ? now.toDateString() : new Date(now.getTime()-86400000).toDateString();
     if(lastRollover !== thresholdDate){
+      // Clear EVERY vendor's session data past the rollover point — completed or not.
+      // An abandoned, never-completed count from a prior day should never carry over.
       Object.keys(VENDORS).forEach(vk=>{
-        if(completed[vk]){
-          counts[vk]={};
-          addons[vk]=[];
-          completed[vk]=null;
-          openLocs[vk]=null;
-        }
+        counts[vk]={};
+        addons[vk]=[];
+        completed[vk]=null;
+        openLocs[vk]=null;
+        delete sess[vk];
       });
       localStorage.setItem(rolloverKey, thresholdDate);
       saveState();
