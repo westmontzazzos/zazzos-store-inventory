@@ -784,7 +784,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '13.9';
+const APP_VERSION = '14.0';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -4166,7 +4166,7 @@ function doPrint(vk, mode){
     </div>`;
   if(mode!=='blank'){ try{ sessionStorage.removeItem('zaz_corrections_'+vk); }catch(e){} }
   logOrderToCloud(vk, mode);
-  window.print();
+  setTimeout(()=>{ window.print(); }, 150);
 }
 
 // 7-tap the trailing "s" in Zazzo's (any screen) = hidden dashboard
