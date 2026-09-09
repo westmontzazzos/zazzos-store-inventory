@@ -784,7 +784,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '14.0';
+const APP_VERSION = '14.1';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1641,6 +1641,58 @@ function showWmBreakdownScreen(mode){
 }
 
 // ─── STEP 4: Review & Print ───────────────────────────────────────────────────
+function printWmBreadOrder(){
+  const vk = activeVendor;
+  const xlItem = wmItem('Line','Extra Longs');
+  const stItem = wmItem('Line','Sourdough Torpedo');
+  const xlQty = Number(getC(vk, xlItem, 'order')) || 0;
+  const stQty = Number(getC(vk, stItem, 'order')) || 0;
+
+  const combinedNames = [
+    {name:'Hamburger Buns', freezerLoc:'Freezer', lineLoc:'Line'},
+    {name:'Filone', freezerLoc:'Freezer', lineLoc:'Line'},
+    {name:'4 Inch Rolls', freezerLoc:'Freezer', lineLoc:null},
+    {name:'Bread Crumbs', freezerLoc:'Freezer', lineLoc:null},
+  ];
+  const additions = combinedNames.map(ci=>{
+    const freezerItem = wmItem(ci.freezerLoc, ci.name);
+    const freezerQty = Number(getC(vk, freezerItem, 'order')) || 0;
+    const lineItem = ci.lineLoc ? wmItem(ci.lineLoc, ci.name) : null;
+    const lineQty = lineItem ? (Number(getC(vk, lineItem, 'order')) || 0) : 0;
+    return {name: ci.name, qty: freezerQty + lineQty};
+  }).filter(r=>r.qty>0);
+
+  document.getElementById('print-area').innerHTML = `
+    <div style="font-family:'Inter',system-ui,sans-serif;font-size:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1A1A2E;padding-bottom:4px;margin-bottom:8px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:0.05em;font-family:'Libre Baskerville',Georgia,serif;">ZAZZO'S WESTMONT INVENTORY</div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#333;margin-top:2px;">BREAD — ORDER ONLY</div>
+        </div>
+        <div style="text-align:right;font-size:9px;color:#555;line-height:1.7;">
+          <div>Order Date: ${currentDate}</div>
+          <div>Delivery Date: ${deliveryDate}</div>
+          <div>Counted by: ${sessionUser}</div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:700;margin-bottom:10px;">
+        Standard Order (Extra Longs: ${xlQty}, Torpedo: ${stQty})
+      </div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#C8102E;margin-bottom:4px;">Additions</div>
+      <table style="width:100%;border-collapse:collapse;font-size:10px;">
+        <tbody>
+          ${additions.length===0 ? `<tr><td style="padding:6px;color:#777;">None</td></tr>` :
+            additions.map(a=>`<tr>
+              <td style="padding:4px 8px;border:1px solid #DDD;">${a.name}</td>
+              <td style="padding:4px 8px;border:1px solid #DDD;text-align:center;font-weight:700;color:#C8102E;">${a.qty}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  logOrderToCloud(vk, 'orderonly');
+  setTimeout(()=>{ window.print(); }, 150);
+}
+
 function showWmReviewScreen(){
   const vk = activeVendor;
 
@@ -1709,7 +1761,7 @@ function showWmReviewScreen(){
     </div>`;
 
   document.getElementById('bWmReviewHome').onclick = ()=>showLogin();
-  document.getElementById('bWmPrint').onclick = ()=>doPrint(vk, 'orderonly');
+  document.getElementById('bWmPrint').onclick = ()=>printWmBreadOrder();
   document.getElementById('bWmComplete').onclick = async ()=>{
     await finishOrderComplete(vk);
   };
@@ -3884,6 +3936,55 @@ function showPrintChoice(vk){
 
 function printHistoricalOrder(b){
   const storeLabel = b.store.charAt(0).toUpperCase()+b.store.slice(1);
+
+  // Westmont Bread gets its own Standard Order / Additions format
+  if(b.store==='westmont' && b.vendor && b.vendor.startsWith('Bread')){
+    const findQty = (name)=>{
+      const row = b.items.find(i=>i.item===name);
+      return row ? Number(row.qty)||0 : 0;
+    };
+    const xlQty = findQty('Extra Longs');
+    const stQty = findQty('Sourdough Torpedo');
+    const additionNames = ['Hamburger Buns','Filone','4 Inch Rolls','Bread Crumbs'];
+    const additions = additionNames.map(name=>({name, qty: findQty(name)})).filter(a=>a.qty>0);
+    // Also include any add-on lines saved with this batch
+    b.items.forEach(i=>{
+      if(i.item.startsWith('[ADD-ON]')){
+        additions.push({name: i.item.replace('[ADD-ON] ',''), qty: i.qty});
+      }
+    });
+
+    document.getElementById('print-area').innerHTML = `
+      <div style="font-family:'Inter',system-ui,sans-serif;font-size:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1A1A2E;padding-bottom:4px;margin-bottom:8px;">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:0.05em;font-family:'Libre Baskerville',Georgia,serif;">ZAZZO'S WESTMONT INVENTORY</div>
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#333;margin-top:2px;">BREAD — REPRINT</div>
+          </div>
+          <div style="text-align:right;font-size:9px;color:#555;line-height:1.7;">
+            <div>Order Date: ${b.date||'—'}</div>
+            <div>Counted by: ${b.by||'—'}</div>
+            <div>Completed: ${new Date(b.created).toLocaleString()}</div>
+          </div>
+        </div>
+        <div style="font-size:12px;font-weight:700;margin-bottom:10px;">
+          Standard Order (Extra Longs: ${xlQty}, Torpedo: ${stQty})
+        </div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:#C8102E;margin-bottom:4px;">Additions</div>
+        <table style="width:100%;border-collapse:collapse;font-size:10px;">
+          <tbody>
+            ${additions.length===0 ? `<tr><td style="padding:6px;color:#777;">None</td></tr>` :
+              additions.map(a=>`<tr>
+                <td style="padding:4px 8px;border:1px solid #DDD;">${a.name}</td>
+                <td style="padding:4px 8px;border:1px solid #DDD;text-align:center;font-weight:700;color:#C8102E;">${a.qty}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    setTimeout(()=>{ window.print(); }, 150);
+    return;
+  }
+
   const vk = Object.keys(VENDORS).find(k=>VENDORS[k].name===b.vendor) || Object.keys(VENDORS).find(k=>b.vendor.startsWith(VENDORS[k].name));
   const isDarien = b.store==='darien';
 
