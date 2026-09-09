@@ -784,7 +784,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '14.1';
+const APP_VERSION = '14.2';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3923,6 +3923,10 @@ function showPrintChoice(vk){
       'This order has not been marked Complete. Press ✓ Complete Order before printing.',
       [{l:'OK',c:'B-red',fn:closeModal}]
     );
+    return;
+  }
+  if(currentLoc==='westmont' && vk.startsWith('bread')){
+    printWmBreadOrder();
     return;
   }
   showModal('Print Order',
