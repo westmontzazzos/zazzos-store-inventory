@@ -784,7 +784,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '14.2';
+const APP_VERSION = '14.3';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -857,6 +857,24 @@ function initLocation(loc){
   Object.keys(VENDORS).forEach(vk => { counts[vk]={}; openLocs[vk]=null; addons[vk]=[]; completed[vk]=null; });
   restoreSavedBreadPars();
   loadState();
+  applySavedItemEdits(loc);
+}
+
+async function applySavedItemEdits(loc){
+  try{
+    const res = await supa('item_edits?store=eq.'+encodeURIComponent(loc)+'&select=*&order=updated_at.asc');
+    if(!res.ok) return;
+    const edits = await res.json();
+    edits.forEach(e=>{
+      const vendorObj = DATA[loc][e.vendor];
+      if(!vendorObj) return;
+      const item = vendorObj.items.find(i=>i.loc===e.loc && i.item===e.original_item);
+      if(item){
+        item.item = e.new_item;
+        item.num = e.new_num || '—';
+      }
+    });
+  }catch(err){}
 }
 
 function ikey(item){ return item.loc+'|'+item.item; }
@@ -3287,9 +3305,10 @@ function showCount(){
       }
       const meta = (item.num!=='—'?'#'+item.num+' · ':'')+'PAR: '+displayPar+wmCaseHint;
       const nameStyle = missingNum ? 'background:#FFF59D;border-radius:3px;padding:0 3px;display:inline-block;' : '';
+      const editAttr = vk==='greco' ? `data-editname="${loc}|${idx}"` : '';
       return `<div class="ProdRow" data-name="${item.item.toLowerCase()}">
         <div class="ProdRow-info">
-          <div class="ProdRow-name" style="${nameStyle}">${item.item}</div>
+          <div class="ProdRow-name" style="${nameStyle}" ${editAttr}>${item.item}</div>
           <div class="ProdRow-meta">${meta}</div>
         </div>
         <div class="DualInput">
@@ -3390,6 +3409,19 @@ function showCount(){
     }
   });
   document.getElementById('bPrint').addEventListener('click',()=>showPrintChoice(vk));
+
+  // Greco only: hold an item's name for 5 seconds to edit its name and item number
+  document.querySelectorAll('[data-editname]').forEach(nameEl=>{
+    let pressTimer = null;
+    const start = ()=>{ pressTimer = setTimeout(()=>showEditItemModal(vk, nameEl.dataset.editname), 5000); };
+    const cancel = ()=>{ if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; } };
+    nameEl.addEventListener('touchstart', start);
+    nameEl.addEventListener('touchend', cancel);
+    nameEl.addEventListener('touchmove', cancel);
+    nameEl.addEventListener('mousedown', start);
+    nameEl.addEventListener('mouseup', cancel);
+    nameEl.addEventListener('mouseleave', cancel);
+  });
   document.getElementById('bBlank').addEventListener('click',()=>doPrint(vk,'blank'));
   document.getElementById('bClear').onclick=()=>{
     showModal('Clear All Counts','This will erase all entries for '+v.name+'. Are you sure?',[
@@ -3915,6 +3947,52 @@ function showModal(title, body, btns){
   el.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>btns[+b.dataset.i].fn());
 }
 function closeModal(){ document.getElementById('modal')?.remove(); }
+
+function showEditItemModal(vk, editKey){
+  const [loc, idxStr] = editKey.split('|');
+  const idx = +idxStr;
+  const items = getLocItems(vk, loc);
+  const item = items[idx];
+  if(!item){ return; }
+
+  showModal('Edit Item',
+    `<div style="text-align:left;">
+      <label style="font-size:12px;font-weight:700;color:#777;text-transform:uppercase;">Item Name</label>
+      <input id="editItemName" type="text" value="${item.item.replace(/"/g,'&quot;')}"
+        style="width:100%;border:2px solid #E2E2E2;border-radius:8px;padding:10px;font-size:15px;margin:6px 0 14px;font-family:'Inter',sans-serif;">
+      <label style="font-size:12px;font-weight:700;color:#777;text-transform:uppercase;">Item Number</label>
+      <input id="editItemNum" type="text" value="${item.num==='—'?'':item.num}"
+        style="width:100%;border:2px solid #E2E2E2;border-radius:8px;padding:10px;font-size:15px;margin:6px 0;font-family:'Inter',sans-serif;">
+    </div>`,
+    [
+      {l:'Cancel', c:'B-outline', fn:closeModal},
+      {l:'Save', c:'B-red', fn: async ()=>{
+        const newName = document.getElementById('editItemName').value.trim();
+        const newNum = document.getElementById('editItemNum').value.trim();
+        if(!newName){ return; }
+        const oldKey = ikey(item);
+        const originalName = item.item;
+        item.item = newName;
+        item.num = newNum || '—';
+        const newKey = ikey(item);
+        if(oldKey!==newKey && counts[vk] && counts[vk][oldKey]){
+          counts[vk][newKey] = counts[vk][oldKey];
+          delete counts[vk][oldKey];
+          saveState();
+        }
+        try{
+          await supa('item_edits?store=eq.'+encodeURIComponent(currentLoc)+'&vendor=eq.'+encodeURIComponent(vk)+'&loc=eq.'+encodeURIComponent(loc)+'&original_item=eq.'+encodeURIComponent(originalName), {method:'DELETE'});
+          await supa('item_edits', {method:'POST', body: JSON.stringify({
+            store: currentLoc, vendor: vk, loc: loc,
+            original_item: originalName, new_item: newName, new_num: newNum || '—'
+          })});
+        }catch(err){}
+        closeModal();
+        showCount();
+      }}
+    ]
+  );
+}
 
 // ─── PRINT ───────────────────────────────────────────────────────────────────
 function showPrintChoice(vk){
