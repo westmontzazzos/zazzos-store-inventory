@@ -786,7 +786,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '14.4';
+const APP_VERSION = '14.5';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3015,6 +3015,87 @@ function showPrintTodayResults(rows){
   });
 }
 
+const WM_WEEKLY_COUNT_ITEMS = ['Dinner Glasses','Silverware Rolls','Carafes','Wine Glasses','Beer Glasses'];
+
+async function showWeeklyCountsScreen(){
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Weekly Counts</div>
+      <div class="H-right"><button class="B B-ghost" id="bWeeklyCountsClose">✕ Close</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">This Week's Count</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Loading averages…</div>
+    </div>`;
+  document.getElementById('bWeeklyCountsClose').onclick = ()=>showLogin();
+
+  let averages = {};
+  try{
+    const res = await supa('weekly_counts?store=eq.'+encodeURIComponent(currentLoc)+'&select=item,qty');
+    const rows = res.ok ? await res.json() : [];
+    WM_WEEKLY_COUNT_ITEMS.forEach(name=>{
+      const vals = rows.filter(r=>r.item===name).map(r=>Number(r.qty)||0);
+      averages[name] = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+    });
+  }catch(e){}
+
+  renderWeeklyCountsForm(averages);
+}
+
+function renderWeeklyCountsForm(averages){
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Weekly Counts</div>
+      <div class="H-right"><button class="B B-ghost" id="bWeeklyCountsClose">✕ Close</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">This Week's Count</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Enter today's count for each item. Average shown is all-time.</div>
+      <div class="LocBlock">
+        ${WM_WEEKLY_COUNT_ITEMS.map(name=>{
+          const avg = averages[name];
+          return `<div class="ProdRow">
+            <div class="ProdRow-info">
+              <div class="ProdRow-name">${name}</div>
+              <div class="ProdRow-meta">${avg!==null ? 'Average: '+avg.toFixed(1) : 'No data yet'}</div>
+            </div>
+            <div class="DualInput">
+              <div class="IG"><label>Count</label>
+                <input class="SI" type="number" min="0" step="any" inputmode="decimal"
+                  data-weeklycount="${name}" value="" placeholder="0">
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="Footer no-print">
+      <button class="B B-red B-lg" style="width:100%;" id="bWeeklyCountsSave">✓ Save Count</button>
+    </div>`;
+
+  document.getElementById('bWeeklyCountsClose').onclick = ()=>showLogin();
+
+  document.getElementById('bWeeklyCountsSave').onclick = async ()=>{
+    const rows = [];
+    document.querySelectorAll('[data-weeklycount]').forEach(inp=>{
+      if(inp.value!==''){
+        rows.push({
+          store: currentLoc,
+          item: inp.dataset.weeklycount,
+          qty: parseFloat(inp.value)||0,
+          counted_by: sessionUser||currentUser||'',
+          count_date: localISO(new Date())
+        });
+      }
+    });
+    if(rows.length===0){ showLogin(); return; }
+    try{
+      await supa('weekly_counts', {method:'POST', body: JSON.stringify(rows)});
+    }catch(e){}
+    showLogin();
+  };
+}
+
 function showIssueNote(){
   const vendorName = activeVendor ? (vdef(activeVendor)?.name || activeVendor) : '';
   const locName = activeVendor ? (openLocs[activeVendor] || '') : '';
@@ -3356,6 +3437,7 @@ function showCount(){
       <div class="H-logo" id="vendorLogo">${v.name}</div>
       <div class="H-right">
         <button class="B B-ghost" id="bFlagIssueCount">🎙</button>
+        ${vk==='foh' ? `<button class="B B-ghost" id="bWeeklyCounts">📋 Weekly Counts</button>` : ''}
         <button class="B B-ghost" id="bBlank">🖨 Blank</button>
         <button class="B B-ghost" id="bHome">← Home</button>
       </div>
@@ -3425,6 +3507,7 @@ function showCount(){
     nameEl.addEventListener('mouseleave', cancel);
   });
   document.getElementById('bBlank').addEventListener('click',()=>doPrint(vk,'blank'));
+  document.getElementById('bWeeklyCounts')?.addEventListener('click',()=>showWeeklyCountsScreen());
   document.getElementById('bClear').onclick=()=>{
     showModal('Clear All Counts','This will erase all entries for '+v.name+'. Are you sure?',[
       {l:'Cancel',c:'B-outline',fn:closeModal},
