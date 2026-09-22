@@ -786,7 +786,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '15.0';
+const APP_VERSION = '15.1';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1008,6 +1008,11 @@ function showLogin(){
   document.querySelectorAll('.LCard[data-vk]').forEach(el=>{
     el.onclick=()=>{
       activeVendor=el.dataset.vk;
+
+      if(activeVendor==='foh'){
+        showWeeklyCountsScreen();
+        return;
+      }
 
       if(activeVendor==='bread'){
         if(currentLoc==='westmont'){
@@ -3020,11 +3025,17 @@ const WM_WEEKLY_COUNT_ITEMS = ['Dinner Glasses','Silverware Rolls','Carafes','Wi
 function showWeeklyCountsScreen(){
   app.innerHTML = `
     <header class="H no-print">
-      <div class="H-logo">FOH Counts</div>
+      <div class="H-logo">FOH Inventory</div>
       <div class="H-right"><button class="B B-ghost" id="bWeeklyCountsClose">✕ Close</button></div>
     </header>
     <div class="Page" style="margin-top:76px;">
-      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:18px;">FOH Weekly Counts</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:18px;">Front of House</div>
+      <div class="LocBlock" style="margin-bottom:14px;cursor:pointer;" id="bTileDailyItems">
+        <div style="padding:20px 16px;">
+          <div style="font-weight:700;font-size:16px;">Daily Items</div>
+          <div style="font-size:13px;color:#777;margin-top:4px;">Ketchup, Mayo, Croutons, and the rest</div>
+        </div>
+      </div>
       <div class="LocBlock" style="margin-bottom:14px;cursor:pointer;" id="bTileThisWeek">
         <div style="padding:20px 16px;">
           <div style="font-weight:700;font-size:16px;">This Week's Count</div>
@@ -3039,6 +3050,16 @@ function showWeeklyCountsScreen(){
       </div>
     </div>`;
   document.getElementById('bWeeklyCountsClose').onclick = ()=>showLogin();
+  document.getElementById('bTileDailyItems').onclick = ()=>{
+    if(!openLocs['foh']) openLocs['foh']=getLocs('foh')[0];
+    const s = sess['foh'];
+    if(s && isSessionFromToday(s)){
+      sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
+      showCount();
+    } else {
+      showVerify('foh');
+    }
+  };
   document.getElementById('bTileThisWeek').onclick = ()=>showThisWeeksCountForm();
   document.getElementById('bTileWeeklyCounts').onclick = ()=>showWeeklyCountsComparison();
 }
