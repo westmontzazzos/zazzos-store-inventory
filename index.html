@@ -786,7 +786,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '14.9';
+const APP_VERSION = '15.0';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3017,15 +3017,40 @@ function showPrintTodayResults(rows){
 
 const WM_WEEKLY_COUNT_ITEMS = ['Dinner Glasses','Silverware Rolls','Carafes','Wine Glasses','Beer Glasses'];
 
-async function showWeeklyCountsScreen(){
+function showWeeklyCountsScreen(){
   app.innerHTML = `
     <header class="H no-print">
-      <div class="H-logo">Weekly Counts</div>
+      <div class="H-logo">FOH Counts</div>
       <div class="H-right"><button class="B B-ghost" id="bWeeklyCountsClose">✕ Close</button></div>
     </header>
     <div class="Page" style="margin-top:76px;">
-      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">This Week's Count</div>
-      <div style="font-size:13px;color:#777;margin-bottom:18px;">Loading averages…</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:18px;">FOH Weekly Counts</div>
+      <div class="LocBlock" style="margin-bottom:14px;cursor:pointer;" id="bTileThisWeek">
+        <div style="padding:20px 16px;">
+          <div style="font-weight:700;font-size:16px;">This Week's Count</div>
+          <div style="font-size:13px;color:#777;margin-top:4px;">Enter Sunday's count</div>
+        </div>
+      </div>
+      <div class="LocBlock" style="cursor:pointer;" id="bTileWeeklyCounts">
+        <div style="padding:20px 16px;">
+          <div style="font-weight:700;font-size:16px;">Weekly Counts</div>
+          <div style="font-size:13px;color:#777;margin-top:4px;">Compare this week vs. last week, see the average</div>
+        </div>
+      </div>
+    </div>`;
+  document.getElementById('bWeeklyCountsClose').onclick = ()=>showLogin();
+  document.getElementById('bTileThisWeek').onclick = ()=>showThisWeeksCountForm();
+  document.getElementById('bTileWeeklyCounts').onclick = ()=>showWeeklyCountsComparison();
+}
+
+async function showThisWeeksCountForm(){
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">This Week's Count</div>
+      <div class="H-right"><button class="B B-ghost" id="bWeeklyCountsClose">✕ Close</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Loading…</div>
     </div>`;
   document.getElementById('bWeeklyCountsClose').onclick = ()=>showLogin();
 
@@ -3045,11 +3070,10 @@ async function showWeeklyCountsScreen(){
 function renderWeeklyCountsForm(averages){
   app.innerHTML = `
     <header class="H no-print">
-      <div class="H-logo">Weekly Counts</div>
+      <div class="H-logo">This Week's Count</div>
       <div class="H-right"><button class="B B-ghost" id="bWeeklyCountsClose">✕ Close</button></div>
     </header>
     <div class="Page" style="margin-top:76px;">
-      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">This Week's Count</div>
       <div style="font-size:13px;color:#777;margin-bottom:18px;">Enter today's count for each item. Average shown is all-time.</div>
       <div class="LocBlock">
         ${WM_WEEKLY_COUNT_ITEMS.map(name=>{
@@ -3096,8 +3120,77 @@ function renderWeeklyCountsForm(averages){
   };
 }
 
+async function showWeeklyCountsComparison(){
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Weekly Counts</div>
+      <div class="H-right"><button class="B B-ghost" id="bWeeklyCountsClose">✕ Close</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Loading…</div>
+    </div>`;
+  document.getElementById('bWeeklyCountsClose').onclick = ()=>showLogin();
+
+  let allRows = [];
+  try{
+    const res = await supa('weekly_counts?store=eq.'+encodeURIComponent(currentLoc)+'&select=item,qty,count_date&order=count_date.desc');
+    allRows = res.ok ? await res.json() : [];
+  }catch(e){}
+
+  // Group by count_date, find the two most recent distinct dates
+  const dates = [...new Set(allRows.map(r=>r.count_date))].sort((a,b)=>b<a?-1:1); // desc
+  const thisWeekDate = dates[0] || null;
+  const lastWeekDate = dates[1] || null;
+
+  function qtyFor(date, item){
+    if(!date) return null;
+    const row = allRows.find(r=>r.count_date===date && r.item===item);
+    return row ? Number(row.qty) : null;
+  }
+
+  const averages = {};
+  WM_WEEKLY_COUNT_ITEMS.forEach(name=>{
+    const vals = allRows.filter(r=>r.item===name).map(r=>Number(r.qty)||0);
+    averages[name] = vals.length ? (vals.reduce((a,b)=>a+b,0)/vals.length) : null;
+  });
+
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Weekly Counts</div>
+      <div class="H-right"><button class="B B-ghost" id="bWeeklyCountsClose">✕ Close</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">
+        ${thisWeekDate ? 'This week: '+thisWeekDate : 'No counts recorded yet.'}${lastWeekDate ? ' · Last week: '+lastWeekDate : ''}
+      </div>
+      <div class="LocBlock">
+        ${WM_WEEKLY_COUNT_ITEMS.map(name=>{
+          const thisQty = qtyFor(thisWeekDate, name);
+          const lastQty = qtyFor(lastWeekDate, name);
+          const diff = (thisQty!==null && lastQty!==null) ? (thisQty - lastQty) : null;
+          const diffStr = diff===null ? '—' : (diff>0 ? '+'+diff : String(diff));
+          const diffColor = diff===null ? '#999' : (diff>0 ? '#1B6B3A' : diff<0 ? '#C8102E' : '#777');
+          const avg = averages[name];
+          return `<div class="ProdRow">
+            <div class="ProdRow-info">
+              <div class="ProdRow-name">${name}</div>
+              <div class="ProdRow-meta">
+                This week: ${thisQty!==null?thisQty:'—'} · Last week: ${lastQty!==null?lastQty:'—'}
+                · <span style="color:${diffColor};font-weight:700;">${diffStr}</span>
+              </div>
+              <div class="ProdRow-meta" style="margin-top:2px;">Average: ${avg!==null ? avg.toFixed(1) : 'No data yet'}</div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+
+  document.getElementById('bWeeklyCountsClose').onclick = ()=>showLogin();
+}
+
 function showIssueNote(){
   const vendorName = activeVendor ? (vdef(activeVendor)?.name || activeVendor) : '';
+
   const locName = activeVendor ? (openLocs[activeVendor] || '') : '';
 
   app.innerHTML = `
