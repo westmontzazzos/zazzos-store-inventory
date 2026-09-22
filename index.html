@@ -786,7 +786,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '15.2';
+const APP_VERSION = '15.3';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3196,21 +3196,20 @@ async function showWeeklyCountsComparison(){
             <div style="font-weight:700;font-size:16px;margin-bottom:10px;">${name}</div>
             <div style="display:flex;gap:8px;text-align:center;">
               <div style="flex:1;">
-                <div style="font-size:28px;font-weight:700;color:#111;">${thisQty!==null?thisQty:'—'}</div>
-                <div style="font-size:10px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">This Week</div>
-              </div>
-              <div style="flex:1;">
                 <div style="font-size:28px;font-weight:700;color:#111;">${lastQty!==null?lastQty:'—'}</div>
                 <div style="font-size:10px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Last Week</div>
               </div>
               <div style="flex:1;">
-                <div style="font-size:28px;font-weight:700;color:${diffColor};">${diffStr}</div>
-                <div style="font-size:10px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Change</div>
+                <div style="font-size:28px;font-weight:700;color:#111;">${thisQty!==null?thisQty:'—'}</div>
+                <div style="font-size:10px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">This Week</div>
               </div>
               <div style="flex:1;">
-                <div style="font-size:28px;font-weight:700;color:#555;">${avg!==null ? avg.toFixed(1) : '—'}</div>
-                <div style="font-size:10px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Average</div>
+                <div style="font-size:28px;font-weight:700;color:${diffColor};">${diffStr}</div>
+                <div style="font-size:10px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Difference</div>
               </div>
+            </div>
+            <div style="text-align:center;margin-top:10px;padding-top:10px;border-top:1px solid #F0F0F0;font-size:13px;color:#777;">
+              Average: <strong style="color:#555;">${avg!==null ? avg.toFixed(1) : '—'}</strong>
             </div>
           </div>`;
         }).join('')}
