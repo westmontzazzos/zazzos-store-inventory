@@ -786,7 +786,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '15.1';
+const APP_VERSION = '15.2';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3192,14 +3192,25 @@ async function showWeeklyCountsComparison(){
           const diffStr = diff===null ? '—' : (diff>0 ? '+'+diff : String(diff));
           const diffColor = diff===null ? '#999' : (diff>0 ? '#1B6B3A' : diff<0 ? '#C8102E' : '#777');
           const avg = averages[name];
-          return `<div class="ProdRow">
-            <div class="ProdRow-info">
-              <div class="ProdRow-name">${name}</div>
-              <div class="ProdRow-meta">
-                This week: ${thisQty!==null?thisQty:'—'} · Last week: ${lastQty!==null?lastQty:'—'}
-                · <span style="color:${diffColor};font-weight:700;">${diffStr}</span>
+          return `<div style="padding:16px;border-bottom:1px solid #EEE;">
+            <div style="font-weight:700;font-size:16px;margin-bottom:10px;">${name}</div>
+            <div style="display:flex;gap:8px;text-align:center;">
+              <div style="flex:1;">
+                <div style="font-size:28px;font-weight:700;color:#111;">${thisQty!==null?thisQty:'—'}</div>
+                <div style="font-size:10px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">This Week</div>
               </div>
-              <div class="ProdRow-meta" style="margin-top:2px;">Average: ${avg!==null ? avg.toFixed(1) : 'No data yet'}</div>
+              <div style="flex:1;">
+                <div style="font-size:28px;font-weight:700;color:#111;">${lastQty!==null?lastQty:'—'}</div>
+                <div style="font-size:10px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Last Week</div>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:28px;font-weight:700;color:${diffColor};">${diffStr}</div>
+                <div style="font-size:10px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Change</div>
+              </div>
+              <div style="flex:1;">
+                <div style="font-size:28px;font-weight:700;color:#555;">${avg!==null ? avg.toFixed(1) : '—'}</div>
+                <div style="font-size:10px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Average</div>
+              </div>
             </div>
           </div>`;
         }).join('')}
