@@ -786,7 +786,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '15.4';
+const APP_VERSION = '15.5';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3192,21 +3192,23 @@ async function showWeeklyCountsComparison(){
           const diffStr = diff===null ? '—' : (diff>0 ? '+'+diff : String(diff));
           const diffColor = diff===null ? '#999' : (diff>0 ? '#1B6B3A' : diff<0 ? '#C8102E' : '#777');
           const avg = averages[name];
-          return `<div style="padding:16px;border-bottom:1px solid #EEE;">
-            <div style="font-weight:700;font-size:16px;">${name}</div>
-            <div style="font-size:12px;color:#999;margin-bottom:10px;">Average: ${avg!==null ? avg.toFixed(1) : '—'}</div>
-            <div style="display:flex;gap:8px;text-align:center;">
-              <div style="flex:1;">
-                <div style="font-size:28px;font-weight:700;color:#111;">${lastQty!==null?lastQty:'—'}</div>
-                <div style="font-size:10px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Last Week</div>
+          return `<div style="padding:16px;border-bottom:1px solid #EEE;display:flex;align-items:center;justify-content:space-between;gap:10px;">
+            <div style="min-width:100px;">
+              <div style="font-weight:700;font-size:16px;">${name}</div>
+              <div style="font-size:12px;color:#999;">Average: ${avg!==null ? avg.toFixed(1) : '—'}</div>
+            </div>
+            <div style="display:flex;gap:16px;text-align:center;">
+              <div>
+                <div style="font-size:24px;font-weight:700;color:#111;">${lastQty!==null?lastQty:'—'}</div>
+                <div style="font-size:9px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.03em;">Last Week</div>
               </div>
-              <div style="flex:1;">
-                <div style="font-size:28px;font-weight:700;color:#111;">${thisQty!==null?thisQty:'—'}</div>
-                <div style="font-size:10px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">This Week</div>
+              <div>
+                <div style="font-size:24px;font-weight:700;color:#111;">${thisQty!==null?thisQty:'—'}</div>
+                <div style="font-size:9px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.03em;">This Week</div>
               </div>
-              <div style="flex:1;">
-                <div style="font-size:28px;font-weight:700;color:${diffColor};">${diffStr}</div>
-                <div style="font-size:10px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.04em;">Difference</div>
+              <div>
+                <div style="font-size:24px;font-weight:700;color:${diffColor};">${diffStr}</div>
+                <div style="font-size:9px;color:#999;text-transform:uppercase;font-weight:700;letter-spacing:0.03em;">Difference</div>
               </div>
             </div>
           </div>`;
