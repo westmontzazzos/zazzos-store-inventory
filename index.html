@@ -782,7 +782,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '15.8';
+const APP_VERSION = '15.9';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1239,8 +1239,9 @@ function enterBreadWestmontAfterChoice(){
   const dow = today.getDay(); // 0=Sun..6=Sat
 
   if(dow===6){
-    const sunDone = !!completed['bread_sunday'];
-    const monDone = !!completed['bread_monday'];
+    const todayISO = localISO(new Date());
+    const sunDone = completed['bread_sunday'] && localISO(new Date(completed['bread_sunday'])) === todayISO;
+    const monDone = completed['bread_monday'] && localISO(new Date(completed['bread_monday'])) === todayISO;
     showModal('Saturday — Two Bread Orders',
       'Saturday requires two separate Bread orders: one for Sunday delivery and one for Monday delivery. Both must be completed.',
       [
@@ -2073,8 +2074,9 @@ function enterBread(){
   const today=new Date();
   const dow=today.getDay(); // 0=Sun..6=Sat
   if(dow===6){
-    const sunDone = !!completed['bread_sunday'];
-    const monDone = !!completed['bread_monday'];
+    const todayISO2 = localISO(new Date());
+    const sunDone = completed['bread_sunday'] && localISO(new Date(completed['bread_sunday'])) === todayISO2;
+    const monDone = completed['bread_monday'] && localISO(new Date(completed['bread_monday'])) === todayISO2;
     if(!sunDone && !monDone){
       showModal('Saturday — Two Bread Orders',
         'You will be prompted to order for both Sunday and Monday. This happens every Saturday and cannot be skipped.',
