@@ -204,16 +204,20 @@ const DATA = {
     {loc:"Prep",item:"Sheets - Wax Paper",num:"70636",par:"3 boxes"},
     {loc:"Dispatch",item:"Tomato Magic",num:"36114",par:"3 cases"},
     {loc:"Prep",item:"Tomato Puree",num:"36110",par:"9 cases"},
-    {loc:"Pizza",item:'Circle - 10"',num:"71010",par:"1"},
-    {loc:"Pizza",item:'Circle - 12"',num:"71012",par:"2"},
-    {loc:"Pizza",item:'Circle - 14"',num:"71014",par:"3"},
-    {loc:"Pizza",item:'Circle - 16"',num:"71016",par:"3"},
-    {loc:"Pizza",item:'Circle - 18"',num:"71018",par:"4"},
-    {loc:"Pizza",item:'Folder - 07"',num:"71030",par:"0"},
-    {loc:"Pizza",item:'Folder - 12"',num:"712182",par:"3"},
-    {loc:"Pizza",item:'Folder - 14"',num:"712184",par:"3"},
-    {loc:"Pizza",item:'Folder - 16"',num:"712186",par:"5"},
-    {loc:"Pizza",item:'Folder - 18"',num:"712188",par:"5"},
+    {loc:"First Oven",item:'Circle - 10"',num:"71010",par:"2"},
+    {loc:"First Oven",item:'Circle - 12"',num:"71012",par:"3"},
+    {loc:"First Oven",item:'Circle - 14"',num:"71014",par:"4"},
+    {loc:"First Oven",item:'Circle - 16"',num:"71016",par:"4"},
+    {loc:"First Oven",item:'Circle - 18"',num:"71018",par:"5"},
+    {loc:"First Oven",item:'Folder - 07"',num:"71030",par:"1"},
+    {loc:"First Oven",item:'Folder - 12"',num:"712182",par:"3"},
+    {loc:"First Oven",item:'Folder - 14"',num:"712184",par:"3"},
+    {loc:"First Oven",item:'Folder - 16"',num:"712186",par:"5"},
+    {loc:"First Oven",item:'Folder - 18"',num:"712188",par:"5"},
+    {loc:"Second Oven",item:'Folder - 12" (2nd Oven)',num:"712182",par:"1 case"},
+    {loc:"Second Oven",item:'Folder - 14" (2nd Oven)',num:"712184",par:"1 case"},
+    {loc:"Second Oven",item:'Folder - 16" (2nd Oven)',num:"712186",par:"1 case"},
+    {loc:"Second Oven",item:'Folder - 18" (2nd Oven)',num:"712188",par:"1 case"},
     {loc:"Pizza Fzr",item:"GF Pizza",num:"505261",par:"1 case"},
     {loc:"Pizza Fzr",item:"Pepperoni",num:"20097",par:"4 bags"},
     {loc:"Dough",item:"Dough - High Gluten",num:"505010",par:"1 bag"},
@@ -784,7 +788,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '16.1';
+const APP_VERSION = '16.2';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -3786,6 +3790,7 @@ function showCount(){
         'Tomato Puree', 'Tomato Magic', 'Dough - King Wheat', 'Oil - Corn',
         'Circle - 10"', 'Circle - 12"', 'Circle - 14"', 'Circle - 16"', 'Circle - 18"',
         'Folder - 07"', 'Folder - 12"', 'Folder - 14"', 'Folder - 16"', 'Folder - 18"',
+        'Folder - 12" (2nd Oven)', 'Folder - 14" (2nd Oven)', 'Folder - 16" (2nd Oven)', 'Folder - 18" (2nd Oven)',
       ]);
 
       // Universal fallback for every other Greco item not specifically dictated:
