@@ -788,7 +788,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '16.2';
+const APP_VERSION = '16.3';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -2394,7 +2394,7 @@ async function pushOrderToSupabase(vk){
           store: currentLoc,
           vendor: vdef(vk).name,
           item: item.item,
-          item_num: item.num,
+          item_num: item.num+'|loc:'+item.loc,
           qty: parseFloat(or)||0,
           on_hand: parseFloat(oh)||0,
           counted_by: sessionUser||'',
@@ -2444,7 +2444,7 @@ async function logOrderToCloud(vk, mode){
           store: currentLoc,
           vendor: vdef(vk).name,
           item: item.item,
-          item_num: item.num,
+          item_num: item.num+'|loc:'+item.loc,
           qty: parseFloat(or)||0,
           on_hand: parseFloat(oh)||0,
           counted_by: sessionUser||'',
@@ -4284,25 +4284,38 @@ function printHistoricalOrder(b){
   const vk = Object.keys(VENDORS).find(k=>VENDORS[k].name===b.vendor) || Object.keys(VENDORS).find(k=>b.vendor.startsWith(VENDORS[k].name));
   const isDarien = b.store==='darien';
 
-  function findItemDef(itemName){
+  function findItemDef(itemName, knownLoc){
     if(!vk) return null;
+    if(knownLoc){
+      const exact = VENDORS[vk].items.find(i=>i.item===itemName && i.loc===knownLoc);
+      if(exact) return exact;
+    }
     return VENDORS[vk].items.find(i=>i.item===itemName) || null;
   }
 
-  // Group items by their real location, in the same order locations first appear in VENDORS,
-  // so the sheet reads section-by-section exactly like the live print does.
+  // Group items by their real location. Newer rows have the location encoded directly in
+  // num as "REALNUM|loc:LOCATION" (fixes items like Coke/Sprite that repeat across sections);
+  // older rows fall back to name-matching against VENDORS, which only finds the first match.
   const locOrder = vk ? [...new Set(VENDORS[vk].items.map(i=>i.loc))] : [];
   const byLoc = {};
   const unmatched = []; // add-ons / anything we can't map to a known location
   b.items.forEach(i=>{
     const cleanName = i.item.replace('[ADD-ON] ','');
-    const def = findItemDef(cleanName);
-    const loc = (def && !i.item.startsWith('[ADD-ON]')) ? def.loc : null;
-    if(loc){
+    let realNum = i.num, loc = null;
+    const locMatch = (i.num||'').match(/^(.*)\|loc:(.+)$/);
+    if(locMatch){
+      realNum = locMatch[1];
+      loc = locMatch[2];
+    }
+    const def = findItemDef(cleanName, loc);
+    if(!loc && def) loc = def.loc;
+    const par = def ? def.par : '—';
+    const rowData = {...i, num: realNum, par};
+    if(loc && !i.item.startsWith('[ADD-ON]')){
       if(!byLoc[loc]) byLoc[loc] = [];
-      byLoc[loc].push({...i, par: def.par});
+      byLoc[loc].push(rowData);
     } else {
-      unmatched.push({...i, par: '—'});
+      unmatched.push({...rowData, par: rowData.par==='—'?'—':rowData.par});
     }
   });
 
