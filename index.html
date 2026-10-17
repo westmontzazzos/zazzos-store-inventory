@@ -788,7 +788,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '16.4';
+const APP_VERSION = '16.5';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1785,7 +1785,24 @@ function showWmReviewScreen(){
   document.getElementById('bWmReviewHome').onclick = ()=>showLogin();
   document.getElementById('bWmPrint').onclick = ()=>printWmBreadOrder();
   document.getElementById('bWmComplete').onclick = async ()=>{
+    const wasSaturdayFlow = (vk==='bread_sunday' || vk==='bread_monday');
     await finishOrderComplete(vk);
+    if(wasSaturdayFlow && new Date().getDay()===6){
+      const todayISO = localISO(new Date());
+      const sunDone = completed['bread_sunday'] && localISO(new Date(completed['bread_sunday'])) === todayISO;
+      const monDone = completed['bread_monday'] && localISO(new Date(completed['bread_monday'])) === todayISO;
+      if(sunDone && !monDone){
+        showModal('Now — Monday\'s Order',
+          'Sunday\'s order is complete. Now you will be given the order for Monday.',
+          [{l:'Continue', c:'B-red', fn:()=>{ closeModal(); showWmStandardOrCountsScreen('bread_monday'); }}]
+        );
+      } else if(monDone && !sunDone){
+        showModal('Now — Sunday\'s Order',
+          'Monday\'s order is complete. Now you will be given the order for Sunday.',
+          [{l:'Continue', c:'B-red', fn:()=>{ closeModal(); showWmStandardOrCountsScreen('bread_sunday'); }}]
+        );
+      }
+    }
   };
 }
 
