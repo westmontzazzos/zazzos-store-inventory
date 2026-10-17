@@ -788,7 +788,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '16.3';
+const APP_VERSION = '16.4';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1216,10 +1216,24 @@ function wmItem(loc, name){ return VENDORS.bread.items.find(i=>i.loc===loc && i.
 let wmAdditional = {}; // { "loc|item": "extra qty" } — transient, folded into order on Continue
 
 function enterBreadWestmont(){
-  showWmStandardOrCountsScreen();
+  const today = new Date();
+  if(today.getDay()===6){
+    const todayISO = localISO(new Date());
+    const sunDone = completed['bread_sunday'] && localISO(new Date(completed['bread_sunday'])) === todayISO;
+    const monDone = completed['bread_monday'] && localISO(new Date(completed['bread_monday'])) === todayISO;
+    showModal('Saturday — Two Bread Orders',
+      'Saturday requires two separate Bread orders: one for Sunday delivery and one for Monday delivery. Both must be completed.',
+      [
+        {l:(sunDone?'✓ ':'')+'Sunday Delivery',c:sunDone?'B-outline':'B-red',fn:()=>{ closeModal(); showWmStandardOrCountsScreen('bread_sunday'); }},
+        {l:(monDone?'✓ ':'')+'Monday Delivery',c:monDone?'B-outline':'B-red',fn:()=>{ closeModal(); showWmStandardOrCountsScreen('bread_monday'); }}
+      ]
+    );
+    return;
+  }
+  showWmStandardOrCountsScreen('bread');
 }
 
-function showWmStandardOrCountsScreen(){
+function showWmStandardOrCountsScreen(targetVk){
   app.innerHTML = `
     <header class="H no-print"><div class="H-logo">Bread</div></header>
     <div class="Page" style="margin-top:76px;">
@@ -1234,31 +1248,11 @@ function showWmStandardOrCountsScreen(){
       </div>
     </div>`;
 
-  document.getElementById('bWmProceedCounts').onclick = ()=>{ enterBreadWestmontAfterChoice(); };
-  document.getElementById('bWmStandardOrder').onclick = ()=>{ wmStandardOrderPending = true; enterBreadWestmontAfterChoice(); };
+  document.getElementById('bWmProceedCounts').onclick = ()=>{ wmStartSession(targetVk); };
+  document.getElementById('bWmStandardOrder').onclick = ()=>{ wmStandardOrderPending = true; wmStartSession(targetVk); };
 }
 
 let wmStandardOrderPending = false;
-
-function enterBreadWestmontAfterChoice(){
-  const today = new Date();
-  const dow = today.getDay(); // 0=Sun..6=Sat
-
-  if(dow===6){
-    const todayISO = localISO(new Date());
-    const sunDone = completed['bread_sunday'] && localISO(new Date(completed['bread_sunday'])) === todayISO;
-    const monDone = completed['bread_monday'] && localISO(new Date(completed['bread_monday'])) === todayISO;
-    showModal('Saturday — Two Bread Orders',
-      'Saturday requires two separate Bread orders: one for Sunday delivery and one for Monday delivery. Both must be completed.',
-      [
-        {l:(sunDone?'✓ ':'')+'Sunday Delivery',c:sunDone?'B-outline':'B-red',fn:()=>{ closeModal(); wmStartSession('bread_sunday'); }},
-        {l:(monDone?'✓ ':'')+'Monday Delivery',c:monDone?'B-outline':'B-red',fn:()=>{ closeModal(); wmStartSession('bread_monday'); }}
-      ]
-    );
-  } else {
-    wmStartSession('bread');
-  }
-}
 
 function wmStartSession(vk){
   activeVendor = vk;
