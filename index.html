@@ -778,7 +778,6 @@ const DATA = {
     {loc:"Cooler",item:"Hamburger Buns",num:"—",parMon:"1",parTue:"1",parWed:"1",parThu:"1",parFri:"2",parSat:"2",parSun:"2"},
     {loc:"Cooler",item:"4 Inch Rolls",num:"—",parMon:"0",parTue:"0",parWed:"0",parThu:"0",parFri:"0",parSat:"0",parSun:"0"},
     {loc:"Cooler",item:"Sourdough Torpedo",num:"—",parMon:"3",parTue:"3",parWed:"3",parThu:"4",parFri:"6",parSat:"6",parSun:"6"},
-    {loc:"Cooler",item:"Bread Crumbs",num:"—",parMon:"1",parTue:"1",parWed:"1",parThu:"1",parFri:"1",parSat:"1",parSun:"1"},
     {loc:"Line",item:"Filone",num:"—",parMon:"1",parTue:"1",parWed:"1",parThu:"1",parFri:"2",parSat:"2",parSun:"2"},
     {loc:"Line",item:"Extra Longs",num:"—",parMon:"6",parTue:"6",parWed:"6",parThu:"6",parFri:"10",parSat:"10",parSun:"8"},
     {loc:"Line",item:"Hamburger Buns",num:"—",parMon:"1",parTue:"1",parWed:"1",parThu:"1",parFri:"2",parSat:"2",parSun:"2"},
@@ -788,7 +787,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '16.5';
+const APP_VERSION = '16.6';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1883,9 +1882,9 @@ function showDarienBreadCountScreen(){
       <div class="H-right"><button class="B B-ghost" id="bDarienBreadBack">← Home</button></div>
     </header>
     <div class="Page" style="margin-top:76px;">
-      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Cooler, Line &amp; Breadcrumbs</div>
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Cooler &amp; Line</div>
       <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Enter On Hand &amp; Order</div>
-      <div style="font-size:13px;color:#777;margin-bottom:18px;">Count what's in the Cooler and on the Line, then fill in what you need to order. Breadcrumbs is estimated as a decimal (see below).</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Count what's in the Cooler and on the Line, then fill in what you need to order.</div>
 
       ${['Cooler','Line'].map(loc=>`
         <div class="LocBlock" style="margin-bottom:14px;">
@@ -1912,31 +1911,6 @@ function showDarienBreadCountScreen(){
             </div>`;
           }).join('')}
         </div>`).join('')}
-
-      <div class="LocBlock">
-        <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:.04em;">Breadcrumbs</div>
-        ${(()=>{
-          const bcItem = items.find(i=>i.item==='Bread Crumbs');
-          const val = getC(vk, bcItem, 'oh');
-          const orderVal = getC(vk, bcItem, 'order');
-          return `<div class="ProdRow">
-            <div class="ProdRow-info">
-              <div class="ProdRow-name">Bread Crumbs</div>
-              <div class="ProdRow-meta">PAR: ${bcItem[parField]} bucket · enter On Hand as a decimal (0.25 = quarter full)</div>
-            </div>
-            <div class="DualInput">
-              <div class="IG"><label>On Hand</label>
-                <input class="SI${val!==''?' filled':''}" type="number" min="0" max="1" step="any" inputmode="decimal"
-                  data-darienbc="1" value="${val}" placeholder="0.5">
-              </div>
-              <div class="IG"><label>Order</label>
-                <input class="SI${orderVal!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
-                  data-darienorder="Cooler|Bread Crumbs" value="${orderVal}" placeholder="0">
-              </div>
-            </div>
-          </div>`;
-        })()}
-      </div>
     </div>
     <div class="Footer no-print">
       <button class="B B-red B-lg" style="width:100%;" id="bDarienBreadNext">Continue →</button>
@@ -1961,18 +1935,6 @@ function showDarienBreadCountScreen(){
       inp.classList.toggle('filled', inp.value!=='');
     };
   });
-
-  const bcInput = document.querySelector('[data-darienbc]');
-  bcInput.oninput = ()=>{
-    const bcItem = items.find(i=>i.item==='Bread Crumbs');
-    setC(vk, bcItem, 'oh', bcInput.value);
-    bcInput.classList.toggle('filled', bcInput.value!=='');
-    // Whole-number safety re-trigger: if they type a whole number (not a decimal 0-1), the explainer must come back
-    const num = parseFloat(bcInput.value);
-    if(!isNaN(num) && Number.isInteger(num) && num >= 1){
-      localStorage.removeItem('zaz_darien_bc_explainer_dismissed_'+currentLoc);
-    }
-  };
 
   document.getElementById('bDarienBreadNext').onclick = ()=>{
     const missing = items.some(item => getC(vk, item, 'oh')==='');
@@ -2132,7 +2094,7 @@ function startDarienBreadOrder(tag){
   const s = sess[vk];
   if(s && isSessionFromToday(s)){
     sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
-    showDarienBreadcrumbsExplainer(null, showDarienBreadCountScreen);
+    showDarienBreadCountScreen();
   } else {
     pendingDarienBreadCount = true;
     showVerify(vk);
@@ -3471,7 +3433,7 @@ function showDateEntry(vk, user){
       showWmReviewScreen();
     } else if(pendingDarienBreadCount){
       pendingDarienBreadCount = false;
-      showDarienBreadcrumbsExplainer(null, showDarienBreadCountScreen);
+      showDarienBreadCountScreen();
     } else if(vk.startsWith('bread') && currentLoc==='westmont'){
       if(wmStandardOrderPending){
         wmStandardOrderPending = false;
