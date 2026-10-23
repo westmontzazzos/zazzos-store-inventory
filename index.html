@@ -787,7 +787,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '16.6';
+const APP_VERSION = '16.7';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1573,10 +1573,14 @@ function showWmBreakdownScreen(mode){
         ${extraItems.map(r=>{
           const item = wmItem(r.loc, r.item);
           const val = getC(vk, item, 'order');
+          const catering = Number(wmCatering[r.item]) || 0;
+          const metaText = catering>0
+            ? `${r.locked?'Standing':'Base'}: ${val} · Catering: ${catering} · <strong>Total will be ${(Number(val)||0)+catering}</strong>`
+            : (r.locked?'Locked — standing quantity':'Editable');
           return `<div class="ProdRow">
             <div class="ProdRow-info">
               <div class="ProdRow-name">${r.item}</div>
-              <div class="ProdRow-meta">${r.locked?'Locked — standing quantity':'Editable'}</div>
+              <div class="ProdRow-meta">${metaText}</div>
             </div>
             <div class="DualInput">
               <div class="IG"><label>Order</label>
