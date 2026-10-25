@@ -97,13 +97,14 @@
     .print-show{display:none;}
     @media print{
       *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
-      @page{margin:0.5in;size:letter portrait;}
+      @page{margin:0.5in;size:letter landscape;}
       body > *{display:none!important;}
       #print-area{display:block!important;width:100%!important;height:auto!important;overflow:visible!important;position:static!important;}
       html, body{height:auto!important;overflow:visible!important;}
-      #print-area table{width:100%!important;border-collapse:collapse!important;}
+      #print-area table{width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;}
       #print-area table{page-break-inside:auto;}
-      #print-area tr{page-break-inside:avoid;page-break-after:auto;}
+      #print-area tr{page-break-inside:avoid;page-break-after:auto;height:auto!important;}
+      #print-area td{line-height:1.4!important;vertical-align:middle!important;overflow:visible!important;}
       #print-area thead{display:table-header-group;}
     }
   </style>
@@ -802,7 +803,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '17.2';
+const APP_VERSION = '17.3';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
