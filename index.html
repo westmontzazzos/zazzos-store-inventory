@@ -803,7 +803,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '17.6';
+const APP_VERSION = '17.7';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1681,19 +1681,40 @@ function showWmBreakdownScreen(mode){
 }
 
 // ─── STEP 4: Review & Print ───────────────────────────────────────────────────
-function printWeeklyBlankSheet(vk){
+async function printWeeklyBlankSheet(vk){
   const v = vdef(vk);
   const locs = getLocs(vk);
   const days = ['','','','','','',''];
+
+  // Pull real order history for this vendor/store and compute an average order quantity per item
+  let averages = {};
+  try{
+    const res = await supa('inventory_orders?store=eq.'+encodeURIComponent(currentLoc)+'&vendor=eq.'+encodeURIComponent(v.name)+'&select=item,qty&limit=5000');
+    if(res.ok){
+      const rows = await res.json();
+      const sums = {}, counts = {};
+      rows.forEach(r=>{
+        const name = (r.item||'').replace('[ADD-ON] ','');
+        if(!sums[name]){ sums[name]=0; counts[name]=0; }
+        sums[name] += Number(r.qty)||0;
+        counts[name]++;
+      });
+      Object.keys(sums).forEach(name=>{
+        averages[name] = sums[name]/counts[name];
+      });
+    }
+  }catch(e){}
 
   let tableRows = '';
   locs.forEach(loc=>{
     const items = getLocItems(vk, loc);
     tableRows += `<tr><td colspan="${2+days.length*2}" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 6px;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;">${loc}</td></tr>`;
     items.forEach(item=>{
+      const avg = averages[item.item];
+      const parDisplay = avg!==undefined ? `${item.par} / ${avg.toFixed(1)}` : item.par;
       tableRows += `<tr>
         <td style="border:1px solid #DDD;padding:3px 5px;font-size:8px;white-space:nowrap;overflow:hidden;">${item.item}</td>
-        <td style="border:1px solid #DDD;padding:3px 5px;font-size:8px;text-align:center;white-space:nowrap;overflow:hidden;">${item.par}</td>
+        <td style="border:1px solid #DDD;padding:3px 5px;font-size:8px;text-align:center;white-space:nowrap;overflow:hidden;">${parDisplay}</td>
         ${days.map(()=>`<td style="border:1px solid #DDD;padding:3px 2px;width:22px;"></td><td style="border:1px solid #DDD;padding:3px 2px;width:22px;"></td>`).join('')}
       </tr>`;
     });
@@ -1712,7 +1733,7 @@ function printWeeklyBlankSheet(vk){
 
   const colgroupCells = `<colgroup>
     <col style="width:200px;">
-    <col style="width:70px;">
+    <col style="width:85px;">
     ${days.map(()=>`<col style="width:22px;"><col style="width:22px;">`).join('')}
   </colgroup>`;
 
