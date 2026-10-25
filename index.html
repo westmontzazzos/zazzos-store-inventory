@@ -803,7 +803,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '17.5';
+const APP_VERSION = '17.6';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1684,7 +1684,7 @@ function showWmBreakdownScreen(mode){
 function printWeeklyBlankSheet(vk){
   const v = vdef(vk);
   const locs = getLocs(vk);
-  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const days = ['','','','','','',''];
 
   let tableRows = '';
   locs.forEach(loc=>{
@@ -1699,7 +1699,7 @@ function printWeeklyBlankSheet(vk){
     });
   });
 
-  const dayHeaderCells = days.map(d=>`<td colspan="2" style="border:1px solid #DDD;background:#F0F0F0;font-weight:700;font-size:8px;text-align:center;padding:2px;">${d}</td>`).join('');
+  const dayHeaderCells = days.map(()=>`<td colspan="2" style="border:1px solid #DDD;background:#F0F0F0;font-weight:700;font-size:8px;text-align:center;padding:2px;">_________</td>`).join('');
   const subHeaderCells = days.map(()=>`<td style="border:1px solid #DDD;background:#FAFAFA;font-size:7px;text-align:center;padding:1px;">OH</td><td style="border:1px solid #DDD;background:#FAFAFA;font-size:7px;text-align:center;padding:1px;">Ord</td>`).join('');
 
   let landscapeStyle = document.getElementById('zaz-landscape-style');
