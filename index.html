@@ -787,7 +787,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '16.7';
+const APP_VERSION = '16.8';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1666,6 +1666,57 @@ function showWmBreakdownScreen(mode){
 }
 
 // ─── STEP 4: Review & Print ───────────────────────────────────────────────────
+function printWeeklyBlankSheet(vk){
+  const v = vdef(vk);
+  const locs = getLocs(vk);
+  const days = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+
+  let tableRows = '';
+  locs.forEach(loc=>{
+    const items = getLocItems(vk, loc);
+    tableRows += `<tr><td colspan="${2+days.length*2}" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 6px;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;">${loc}</td></tr>`;
+    items.forEach(item=>{
+      tableRows += `<tr>
+        <td style="border:1px solid #DDD;padding:3px 5px;font-size:8px;white-space:nowrap;">${item.item}</td>
+        <td style="border:1px solid #DDD;padding:3px 5px;font-size:8px;text-align:center;white-space:nowrap;">${item.par}</td>
+        ${days.map(()=>`<td style="border:1px solid #DDD;padding:3px 2px;width:22px;"></td><td style="border:1px solid #DDD;padding:3px 2px;width:22px;"></td>`).join('')}
+      </tr>`;
+    });
+  });
+
+  const dayHeaderCells = days.map(d=>`<td colspan="2" style="border:1px solid #DDD;background:#F0F0F0;font-weight:700;font-size:8px;text-align:center;padding:2px;">${d}</td>`).join('');
+  const subHeaderCells = days.map(()=>`<td style="border:1px solid #DDD;background:#FAFAFA;font-size:7px;text-align:center;padding:1px;">OH</td><td style="border:1px solid #DDD;background:#FAFAFA;font-size:7px;text-align:center;padding:1px;">Ord</td>`).join('');
+
+  let landscapeStyle = document.getElementById('zaz-landscape-style');
+  if(!landscapeStyle){
+    landscapeStyle = document.createElement('style');
+    landscapeStyle.id = 'zaz-landscape-style';
+    document.head.appendChild(landscapeStyle);
+  }
+  landscapeStyle.textContent = '@media print{ @page{ size: letter landscape; margin:0.4in; } }';
+
+  document.getElementById('print-area').innerHTML = `
+    <div style="font-family:'Inter',system-ui,sans-serif;">
+      <div style="border-bottom:2px solid #1A1A2E;padding-bottom:4px;margin-bottom:6px;">
+        <div style="font-size:13px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:0.05em;font-family:'Libre Baskerville',Georgia,serif;">ZAZZO'S ${currentLoc.toUpperCase()} — ${v.name.toUpperCase()}</div>
+        <div style="font-size:8px;color:#555;">WEEKLY BLANK ORDER FORM — WEEK OF: _________________</div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+        <tr>
+          <td rowspan="2" style="border:1px solid #DDD;background:#F0F0F0;font-weight:700;font-size:8px;padding:2px;">Item</td>
+          <td rowspan="2" style="border:1px solid #DDD;background:#F0F0F0;font-weight:700;font-size:8px;padding:2px;text-align:center;">Par</td>
+          ${dayHeaderCells}
+        </tr>
+        <tr>${subHeaderCells}</tr>
+        ${tableRows}
+      </table>
+    </div>`;
+  setTimeout(()=>{
+    window.print();
+    setTimeout(()=>{ if(landscapeStyle) landscapeStyle.textContent = ''; }, 500);
+  }, 150);
+}
+
 function printWmBreadOrder(){
   const vk = activeVendor;
   const xlItem = wmItem('Line','Extra Longs');
@@ -3543,6 +3594,7 @@ function showCount(){
       <div class="H-right">
         <button class="B B-ghost" id="bFlagIssueCount">🎙</button>
         ${vk==='foh' ? `<button class="B B-ghost" id="bWeeklyCounts">📋 Weekly Counts</button>` : ''}
+        <button class="B B-ghost" id="bWeeklyForm">📄 Weekly Form</button>
         <button class="B B-ghost" id="bBlank">🖨 Blank</button>
         <button class="B B-ghost" id="bHome">← Home</button>
       </div>
@@ -3612,6 +3664,7 @@ function showCount(){
     nameEl.addEventListener('mouseleave', cancel);
   });
   document.getElementById('bBlank').addEventListener('click',()=>doPrint(vk,'blank'));
+  document.getElementById('bWeeklyForm')?.addEventListener('click',()=>printWeeklyBlankSheet(vk));
   document.getElementById('bWeeklyCounts')?.addEventListener('click',()=>showWeeklyCountsScreen());
   document.getElementById('bClear').onclick=()=>{
     showModal('Clear All Counts','This will erase all entries for '+v.name+'. Are you sure?',[
