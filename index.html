@@ -802,7 +802,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '17.0';
+const APP_VERSION = '17.1';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -933,8 +933,7 @@ function showLogin(){
         if(l==='westmont'){
           showPasswordGate(()=>{ initLocation('westmont'); showLogin(); }, ()=>showLogin());
         } else {
-          initLocation('darien');
-          showLogin();
+          showDarienPasswordGate(()=>{ initLocation('darien'); showLogin(); }, ()=>showLogin());
         }
       };
     });
@@ -2226,6 +2225,32 @@ function showPasswordGate(onSuccess, onBack){
     inp.value=''; inp.style.borderColor='#C8102E'; inp.placeholder='Wrong password';
   };
   document.getElementById('bPwBack').onclick=onBack;
+}
+
+function showDarienPasswordGate(onSuccess, onBack){
+  app.innerHTML=`
+    <div class="Login">
+      <div>
+        <div class="Login-logo" style="font-size:40px;"><span id="darienLockIcon" style="cursor:pointer;user-select:none;">🔒</span></div>
+        <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;color:#111;text-align:center;margin-top:8px;">Darien Password</div>
+      </div>
+      <div style="width:100%;max-width:320px;display:flex;flex-direction:column;gap:16px;">
+        <input id="darienPwInput" type="password" inputmode="numeric" maxlength="10" placeholder="••••"
+          style="width:100%;height:56px;border:2px solid #1B6B3A;border-radius:10px;font-size:26px;font-weight:700;text-align:center;font-family:monospace;padding:0 12px;color:#111;letter-spacing:0.3em;">
+        <button class="B B-red B-lg" style="width:100%;" id="bDarienPwGo">Unlock →</button>
+        <button class="B B-outline" style="width:100%;" id="bDarienPwBack">← Back</button>
+      </div>
+    </div>`;
+
+  document.getElementById('bDarienPwGo').onclick=()=>{
+    const inp=document.getElementById('darienPwInput');
+    if(inp.value==='1044'){
+      onSuccess();
+    } else {
+      inp.value=''; inp.style.borderColor='#C8102E'; inp.placeholder='Wrong password';
+    }
+  };
+  document.getElementById('bDarienPwBack').onclick=onBack;
 }
 
 function showOtherFirst(){
