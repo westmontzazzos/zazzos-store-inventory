@@ -803,7 +803,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '17.3';
+const APP_VERSION = '17.5';
 let currentLoc = null;
 
 const SEQ = () => currentLoc==='darien';
@@ -1692,8 +1692,8 @@ function printWeeklyBlankSheet(vk){
     tableRows += `<tr><td colspan="${2+days.length*2}" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 6px;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;">${loc}</td></tr>`;
     items.forEach(item=>{
       tableRows += `<tr>
-        <td style="border:1px solid #DDD;padding:3px 5px;font-size:8px;white-space:nowrap;">${item.item}</td>
-        <td style="border:1px solid #DDD;padding:3px 5px;font-size:8px;text-align:center;white-space:nowrap;">${item.par}</td>
+        <td style="border:1px solid #DDD;padding:3px 5px;font-size:8px;white-space:nowrap;overflow:hidden;">${item.item}</td>
+        <td style="border:1px solid #DDD;padding:3px 5px;font-size:8px;text-align:center;white-space:nowrap;overflow:hidden;">${item.par}</td>
         ${days.map(()=>`<td style="border:1px solid #DDD;padding:3px 2px;width:22px;"></td><td style="border:1px solid #DDD;padding:3px 2px;width:22px;"></td>`).join('')}
       </tr>`;
     });
@@ -1710,6 +1710,12 @@ function printWeeklyBlankSheet(vk){
   }
   landscapeStyle.textContent = '@media print{ @page{ size: letter landscape; margin:0.4in; } }';
 
+  const colgroupCells = `<colgroup>
+    <col style="width:200px;">
+    <col style="width:70px;">
+    ${days.map(()=>`<col style="width:22px;"><col style="width:22px;">`).join('')}
+  </colgroup>`;
+
   document.getElementById('print-area').innerHTML = `
     <div style="font-family:'Inter',system-ui,sans-serif;">
       <div style="border-bottom:2px solid #1A1A2E;padding-bottom:4px;margin-bottom:6px;">
@@ -1717,9 +1723,10 @@ function printWeeklyBlankSheet(vk){
         <div style="font-size:8px;color:#555;">WEEKLY BLANK ORDER FORM — WEEK OF: _________________</div>
       </div>
       <table style="width:100%;border-collapse:collapse;table-layout:fixed;">
+        ${colgroupCells}
         <tr>
-          <td rowspan="2" style="border:1px solid #DDD;background:#F0F0F0;font-weight:700;font-size:8px;padding:2px;">Item</td>
-          <td rowspan="2" style="border:1px solid #DDD;background:#F0F0F0;font-weight:700;font-size:8px;padding:2px;text-align:center;">Par</td>
+          <td rowspan="2" style="border:1px solid #DDD;background:#F0F0F0;font-weight:700;font-size:8px;padding:2px;overflow:hidden;">Item</td>
+          <td rowspan="2" style="border:1px solid #DDD;background:#F0F0F0;font-weight:700;font-size:8px;padding:2px;text-align:center;overflow:hidden;">Par</td>
           ${dayHeaderCells}
         </tr>
         <tr>${subHeaderCells}</tr>
