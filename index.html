@@ -803,10 +803,10 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '17.7';
+const APP_VERSION = '17.8';
 let currentLoc = null;
 
-const SEQ = () => currentLoc==='darien';
+const SEQ = () => false;
 
 // ─── STATE ───────────────────────────────────────────────────────────────────
 let activeVendor = null;
@@ -1710,11 +1710,9 @@ async function printWeeklyBlankSheet(vk){
     const items = getLocItems(vk, loc);
     tableRows += `<tr><td colspan="${2+days.length*2}" style="background:#1A1A2E;color:#fff;font-weight:700;padding:4px 6px;font-size:9px;text-transform:uppercase;letter-spacing:0.06em;">${loc}</td></tr>`;
     items.forEach(item=>{
-      const avg = averages[item.item];
-      const parDisplay = avg!==undefined ? `${item.par} / ${avg.toFixed(1)}` : item.par;
       tableRows += `<tr>
         <td style="border:1px solid #DDD;padding:3px 5px;font-size:8px;white-space:nowrap;overflow:hidden;">${item.item}</td>
-        <td style="border:1px solid #DDD;padding:3px 5px;font-size:8px;text-align:center;white-space:nowrap;overflow:hidden;">${parDisplay}</td>
+        <td style="border:1px solid #DDD;padding:3px 5px;font-size:8px;text-align:center;white-space:nowrap;overflow:hidden;">${item.par}</td>
         ${days.map(()=>`<td style="border:1px solid #DDD;padding:3px 2px;width:22px;"></td><td style="border:1px solid #DDD;padding:3px 2px;width:22px;"></td>`).join('')}
       </tr>`;
     });
