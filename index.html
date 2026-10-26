@@ -803,7 +803,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '17.8';
+const APP_VERSION = '17.9';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -4448,9 +4448,9 @@ function printHistoricalOrder(b){
     return def ? def.par : '—';
   }
 
-  // Build the same "PAR EXCEEDED" alert section the live print shows — Darien only
+  // PAR EXCEEDED alert section removed per Ely's request
   let alertRows = '';
-  if(isDarien){
+  if(false){
     b.items.forEach(i=>{
       const itemName = i.item.replace('[ADD-ON] ','');
       const parRaw = findPar(itemName);
@@ -4586,9 +4586,9 @@ function doPrint(vk, mode){
   }
   }
 
-  // Par-exceeded alerts: OH + Order > Par
+  // Par-exceeded alerts removed per Ely's request
   let alertRows='';
-  if(currentLoc==='darien' && mode!=='blank'){
+  if(false){
     vdef(vk).items.forEach(item=>{
       const parRaw = (vk.startsWith('bread') && item[breadParFieldFor(vk)]!==undefined) ? item[breadParFieldFor(vk)] : item.par;
       const parNum=parseFloat(parRaw);
