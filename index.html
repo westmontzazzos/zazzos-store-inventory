@@ -802,7 +802,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '18.6';
+const APP_VERSION = '18.7';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -4386,15 +4386,8 @@ function showCount(){
 
       // No auto-advance — user taps the Next button to move on their own time
 
-      // Auto-advance to next LOCATION only fires when a manual On Hand or Order entry completes
-      // the location — never when a field was filled by an auto-populate rule, so the person
-      // always gets a chance to see and adjust the suggested number before moving on.
-      if(f==='order' && locComplete(v2,loc)){
-        const locs2=getLocs(v2), li2=locs2.indexOf(loc), nextLoc=locs2[li2+1];
-        if(nextLoc && openLocs[v2]===loc){
-          setTimeout(()=>{ openLocs[v2]=nextLoc; showCount(); scrollToBlock(li2+1); },350);
-        }
-      }
+      // No auto-advance of any kind. Editing a field leaves you on that field until YOU
+      // tap the Next arrow, the next field, or the next section.
     };
     input.onclick=e=>e.stopPropagation();
   });
