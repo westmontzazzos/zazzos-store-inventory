@@ -803,7 +803,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '18.1';
+const APP_VERSION = '18.2';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -2135,6 +2135,81 @@ function showDarienBreadCateringEntry(){
   };
 }
 
+function showDarienBreadAfterComplete(vk){
+  if(vk==='bread_sunday' || vk==='bread_monday'){
+    const todayISO = localISO(new Date());
+    const sunDone = completed['bread_sunday'] && localISO(new Date(completed['bread_sunday'])) === todayISO;
+    const monDone = completed['bread_monday'] && localISO(new Date(completed['bread_monday'])) === todayISO;
+    if(sunDone && !monDone){
+      showModal('Now — Monday\'s Order',
+        'Sunday\'s order is complete. You must do Monday\'s order before you can print.',
+        [{l:'Continue', c:'B-red', fn:()=>{ closeModal(); startDarienBreadOrder('monday'); }}]
+      );
+      return;
+    }
+    if(monDone && !sunDone){
+      showModal('Now — Sunday\'s Order',
+        'Monday\'s order is complete. You must do Sunday\'s order before you can print.',
+        [{l:'Continue', c:'B-red', fn:()=>{ closeModal(); startDarienBreadOrder('sunday'); }}]
+      );
+      return;
+    }
+    showDarienSaturdayFinalScreen();
+    return;
+  }
+  showDarienBreadFinalScreen();
+}
+
+function showDarienSaturdayFinalScreen(){
+  const items = VENDORS.bread.items;
+  const sections = [['bread_sunday','Sunday Delivery'],['bread_monday','Monday Delivery']];
+  const body = sections.map(([svk,label])=>{
+    ensureBreadAliasState(svk);
+    const ordered = items.filter(item=>{
+      const or = getC(svk, item, 'order');
+      return or !== '' && or !== '0';
+    });
+    return `
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:16px;font-weight:700;margin:6px 0 8px;">${label}</div>
+      <div class="LocBlock" style="margin-bottom:14px;">
+        ${ordered.length===0 ? `<div style="padding:16px;color:#777;">Nothing to order — everything's at par.</div>` :
+          ordered.map(item=>`
+            <div class="ProdRow">
+              <div class="ProdRow-info">
+                <div class="ProdRow-name">${item.item}</div>
+                <div class="ProdRow-meta">${item.loc}</div>
+              </div>
+              <div style="font-weight:700;font-size:16px;color:#C8102E;">×${getC(svk,item,'order')}</div>
+            </div>`).join('')}
+      </div>`;
+  }).join('');
+
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Both Orders Complete</div>
+      ${body}
+    </div>
+    <div class="Footer no-print" style="display:flex;gap:8px;">
+      <button class="B B-outline" style="flex:1;" id="bDarienSatHome">← Home</button>
+      <button class="B B-red" style="flex:2;" id="bDarienSatPrintSun">🖨 Print Sunday</button>
+      <button class="B B-red" style="flex:2;" id="bDarienSatPrintMon">🖨 Print Monday</button>
+    </div>`;
+
+  const printFor = (svk)=>{
+    activeVendor = svk;
+    const s = sess[svk];
+    if(s){ sessionUser = s.user; currentDate = s.orderDate; deliveryDate = s.deliveryDate; }
+    doPrint(svk, 'orderonly');
+  };
+  document.getElementById('bDarienSatHome').onclick = ()=>showLogin();
+  document.getElementById('bDarienSatPrintSun').onclick = ()=>printFor('bread_sunday');
+  document.getElementById('bDarienSatPrintMon').onclick = ()=>printFor('bread_monday');
+}
+
 function showDarienBreadFinalScreen(){
   const vk = activeVendor;
   const items = VENDORS.bread.items;
@@ -2207,7 +2282,7 @@ function showDarienBreadConfirmScreen(){
   document.getElementById('bDarienBreadEdit').onclick = ()=>showDarienBreadEditScreen();
   document.getElementById('bDarienBreadBack2').onclick = ()=>showDarienBreadCountScreen();
   document.getElementById('bDarienBreadComplete').onclick = async ()=>{
-    await finishOrderComplete(vk, showDarienBreadFinalScreen);
+    await finishOrderComplete(vk, ()=>showDarienBreadAfterComplete(vk));
   };
 }
 
@@ -2282,23 +2357,22 @@ function enterBread(){
     const sunDone = completed['bread_sunday'] && localISO(new Date(completed['bread_sunday'])) === todayISO2;
     const monDone = completed['bread_monday'] && localISO(new Date(completed['bread_monday'])) === todayISO2;
     if(!sunDone && !monDone){
-      showModal('Saturday — Two Bread Orders',
-        'You will be prompted to order for both Sunday and Monday. This happens every Saturday and cannot be skipped.',
-        [{l:'Understood', c:'B-red', fn:()=>{ closeModal(); startDarienBreadOrder('sunday'); }}]
+      showModal('You Have Two Orders to Make',
+        'Saturday means two bread orders: Sunday\'s delivery and Monday\'s delivery. You can\'t print until both are done.',
+        [{l:'Start', c:'B-red', fn:()=>{ closeModal(); startDarienBreadOrder('sunday'); }}]
       );
     } else if(sunDone && !monDone){
       showModal('Now — Monday\'s Order',
-        'Sunday\'s order is complete. Now you will be given the order for Monday.',
+        'Sunday\'s order is complete. You must do Monday\'s order before you can print.',
         [{l:'Continue', c:'B-red', fn:()=>{ closeModal(); startDarienBreadOrder('monday'); }}]
       );
-    } else {
-      showModal('Both Orders Complete',
-        'Sunday and Monday\'s Bread orders are both done for this Saturday.',
-        [
-          {l:'Review Sunday',c:'B-outline',fn:()=>{ closeModal(); activeVendor='bread_sunday'; reviewMode=true; showCount(); }},
-          {l:'Review Monday',c:'B-outline',fn:()=>{ closeModal(); activeVendor='bread_monday'; reviewMode=true; showCount(); }}
-        ]
+    } else if(!sunDone && monDone){
+      showModal('Now — Sunday\'s Order',
+        'Monday\'s order is complete. You must do Sunday\'s order before you can print.',
+        [{l:'Continue', c:'B-red', fn:()=>{ closeModal(); startDarienBreadOrder('sunday'); }}]
       );
+    } else {
+      showDarienSaturdayFinalScreen();
     }
   } else {
     startDarienBreadOrder(null);
