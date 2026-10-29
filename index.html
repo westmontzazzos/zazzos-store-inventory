@@ -802,7 +802,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '18.5';
+const APP_VERSION = '18.6';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -1058,8 +1058,8 @@ function showLogin(){
             showModal('Order Already Completed',
               'This order was marked complete. What would you like to do?',
               [
-                {l:'Review Order',c:'B-outline',fn:()=>{ closeModal(); activeVendor='bread'; reviewMode=true; showCount(); }},
-                {l:'Edit Order',c:'B-red',fn:()=>{ closeModal(); reviewMode=false; enterBread(); }}
+                {l:'Review Order',c:'B-outline',fn:()=>{ closeModal(); activeVendor='bread'; reviewMode=false; showDarienBreadFinalScreen(); }},
+                {l:'Edit Order',c:'B-red',fn:()=>{ closeModal(); activeVendor='bread'; reviewMode=false; showDarienBreadConfirmScreen(); }}
               ]
             );
           } else {
