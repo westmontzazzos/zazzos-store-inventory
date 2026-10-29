@@ -803,7 +803,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '18.2';
+const APP_VERSION = '18.3';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -2068,11 +2068,11 @@ function showDarienBreadStartScreen(){
     <div class="Page" style="margin-top:76px;">
       <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:18px;">Bread Order</div>
       <div class="LocBlock" style="padding:16px;">
-        <button class="B B-red B-lg" style="width:100%;" id="bDarienCompleteCounts">Complete Counts</button>
+        <button class="B B-red B-lg" style="width:100%;" id="bDarienCompleteCounts">Start Today's Order</button>
       </div>
     </div>`;
   document.getElementById('bDarienStartHome').onclick = ()=>showLogin();
-  document.getElementById('bDarienCompleteCounts').onclick = ()=>showDarienBreadCountScreen();
+  document.getElementById('bDarienCompleteCounts').onclick = ()=>startDarienBreadOrder(null);
 }
 
 function showDarienBreadCateringScreen(){
@@ -2375,7 +2375,7 @@ function enterBread(){
       showDarienSaturdayFinalScreen();
     }
   } else {
-    startDarienBreadOrder(null);
+    showDarienBreadStartScreen();
   }
 }
 
@@ -2394,7 +2394,7 @@ function startDarienBreadOrder(tag){
   const s = sess[vk];
   if(s && isSessionFromToday(s)){
     sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
-    showDarienBreadStartScreen();
+    showDarienBreadCountScreen();
   } else {
     pendingDarienBreadCount = true;
     showVerify(vk);
@@ -3757,7 +3757,7 @@ function showDateEntry(vk, user){
       showWmReviewScreen();
     } else if(pendingDarienBreadCount){
       pendingDarienBreadCount = false;
-      showDarienBreadStartScreen();
+      showDarienBreadCountScreen();
     } else if(vk.startsWith('bread') && currentLoc==='westmont'){
       if(wmStandardOrderPending){
         wmStandardOrderPending = false;
