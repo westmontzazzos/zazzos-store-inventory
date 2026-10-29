@@ -803,7 +803,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '17.9';
+const APP_VERSION = '18.0';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -1979,31 +1979,26 @@ function showDarienBreadCountScreen(){
     </header>
     <div class="Page" style="margin-top:76px;">
       <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Cooler &amp; Line</div>
-      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Enter On Hand &amp; Order</div>
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Count &amp; Order</div>
       <div style="font-size:13px;color:#777;margin-bottom:18px;">Count what's in the Cooler and on the Line, then fill in what you need to order.</div>
 
       ${['Cooler','Line'].map(loc=>`
         <div class="LocBlock" style="margin-bottom:14px;">
-          <div style="padding:10px 16px 0;font-size:11px;font-weight:700;color:#1B6B3A;text-transform:uppercase;letter-spacing:.04em;">${loc}</div>
+          <div style="padding:10px 16px 6px;font-size:11px;font-weight:700;color:#1B6B3A;text-transform:uppercase;letter-spacing:.04em;">${loc}</div>
+          <div style="display:grid;grid-template-columns:1fr 44px 70px 70px;gap:8px;padding:0 16px 6px;font-size:10px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:.04em;">
+            <div>Item</div><div style="text-align:center;">Par</div><div style="text-align:center;">Count</div><div style="text-align:center;">Order</div>
+          </div>
           ${items.filter(i=>i.loc===loc && i.item!=='Bread Crumbs').map(item=>{
             const val = getC(vk, item, 'oh');
             const orderVal = getC(vk, item, 'order');
             const par = item[parField];
-            return `<div class="ProdRow">
-              <div class="ProdRow-info">
-                <div class="ProdRow-name">${item.item}</div>
-                <div class="ProdRow-meta">PAR: ${par}</div>
-              </div>
-              <div class="DualInput">
-                <div class="IG"><label>On Hand</label>
-                  <input class="SI${val!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
-                    data-darienoh="${loc}|${item.item}" value="${val}" placeholder="0">
-                </div>
-                <div class="IG"><label>Order</label>
-                  <input class="SI${orderVal!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
-                    data-darienorder="${loc}|${item.item}" value="${orderVal}" placeholder="0">
-                </div>
-              </div>
+            return `<div style="display:grid;grid-template-columns:1fr 44px 70px 70px;gap:8px;align-items:center;padding:8px 16px;border-top:1px solid #F0F0F0;">
+              <div style="font-weight:700;font-size:14px;">${item.item}</div>
+              <div style="text-align:center;font-size:16px;font-weight:700;color:#555;">${par}</div>
+              <input class="SI${val!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
+                data-darienoh="${loc}|${item.item}" value="${val}" placeholder="0" style="width:100%;">
+              <input class="SI${orderVal!==''?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
+                data-darienorder="${loc}|${item.item}" value="${orderVal}" placeholder="0" style="width:100%;">
             </div>`;
           }).join('')}
         </div>`).join('')}
