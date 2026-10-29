@@ -790,7 +790,6 @@ const DATA = {
 
   bread:{name:"Bread",emoji:"🍞",sub:"Bakery",items:[
     {loc:"Cooler",item:"Filone",num:"—",parMon:"1",parTue:"1",parWed:"1",parThu:"1",parFri:"2",parSat:"2",parSun:"2"},
-    {loc:"Cooler",item:"Extra Longs",num:"—",parMon:"6",parTue:"6",parWed:"6",parThu:"6",parFri:"10",parSat:"10",parSun:"8"},
     {loc:"Cooler",item:"Hamburger Buns",num:"—",parMon:"1",parTue:"1",parWed:"1",parThu:"1",parFri:"2",parSat:"2",parSun:"2"},
     {loc:"Cooler",item:"4 Inch Rolls",num:"—",parMon:"0",parTue:"0",parWed:"0",parThu:"0",parFri:"0",parSat:"0",parSun:"0"},
     {loc:"Cooler",item:"Sourdough Torpedo",num:"—",parMon:"3",parTue:"3",parWed:"3",parThu:"4",parFri:"6",parSat:"6",parSun:"6"},
@@ -803,7 +802,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '18.3';
+const APP_VERSION = '18.4';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -1967,11 +1966,23 @@ function showDarienBreadcrumbsExplainer(onDismissForever, onContinue){
   };
 }
 
+function darienAutoOrder(item, parField, ohValue){
+  const oh = parseFloat(ohValue);
+  if(isNaN(oh)) return '';
+  const par = Number(item[parField])||0;
+  return String(Math.max(0, par - oh));
+}
+
 function showDarienBreadCountScreen(){
   const vk = activeVendor;
   stripDarienCatering(vk);
   const parField = darienBreadParFieldForVk(vk);
   const items = VENDORS.bread.items; // Cooler + Line + Breadcrumbs, all in one flat list
+  items.forEach(item=>{
+    if(getC(vk,item,'oh')!=='' && getC(vk,item,'order')===''){
+      setC(vk, item, 'order', darienAutoOrder(item, parField, getC(vk,item,'oh')));
+    }
+  });
 
   app.innerHTML = `
     <header class="H no-print">
@@ -2016,6 +2027,10 @@ function showDarienBreadCountScreen(){
       const item = items.find(i=>i.loc===loc && i.item===name);
       setC(vk, item, 'oh', inp.value);
       inp.classList.toggle('filled', inp.value!=='');
+      const auto = darienAutoOrder(item, parField, inp.value);
+      setC(vk, item, 'order', auto);
+      const ordInp = document.querySelector('[data-darienorder="'+loc+'|'+name+'"]');
+      if(ordInp){ ordInp.value = auto; ordInp.classList.toggle('filled', auto!==''); }
     };
   });
 
