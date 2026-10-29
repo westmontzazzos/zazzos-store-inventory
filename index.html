@@ -803,7 +803,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '18.0';
+const APP_VERSION = '18.1';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -1969,6 +1969,7 @@ function showDarienBreadcrumbsExplainer(onDismissForever, onContinue){
 
 function showDarienBreadCountScreen(){
   const vk = activeVendor;
+  stripDarienCatering(vk);
   const parField = darienBreadParFieldForVk(vk);
   const items = VENDORS.bread.items; // Cooler + Line + Breadcrumbs, all in one flat list
 
@@ -2031,8 +2032,141 @@ function showDarienBreadCountScreen(){
     const missing = items.some(item => getC(vk, item, 'oh')==='');
     if(missing){ showModal('Missing Counts','Please enter On Hand for every item.',[{l:'OK',c:'B-red',fn:closeModal}]); return; }
 
+    showDarienBreadCateringScreen();
+  };
+}
+
+let darienCatering = {};        // what the person entered for catering, by item name
+let darienCateringApplied = {}; // what is currently folded into the Line order quantities
+
+function darienLineRow(name){ return VENDORS.bread.items.find(i=>i.loc==='Line' && i.item===name); }
+function stripDarienCatering(vk){
+  Object.keys(darienCateringApplied).forEach(name=>{
+    const row = darienLineRow(name); if(!row) return;
+    const cur = Number(getC(vk,row,'order'))||0;
+    setC(vk,row,'order',String(Math.max(0,cur-darienCateringApplied[name])));
+  });
+  darienCateringApplied = {};
+}
+function applyDarienCatering(vk){
+  stripDarienCatering(vk);
+  Object.keys(darienCatering).forEach(name=>{
+    const q = Number(darienCatering[name])||0; if(q<=0) return;
+    const row = darienLineRow(name); if(!row) return;
+    const cur = Number(getC(vk,row,'order'))||0;
+    setC(vk,row,'order',String(cur+q));
+    darienCateringApplied[name] = q;
+  });
+}
+
+function showDarienBreadStartScreen(){
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"><button class="B B-ghost" id="bDarienStartHome">← Home</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:18px;">Bread Order</div>
+      <div class="LocBlock" style="padding:16px;">
+        <button class="B B-red B-lg" style="width:100%;" id="bDarienCompleteCounts">Complete Counts</button>
+      </div>
+    </div>`;
+  document.getElementById('bDarienStartHome').onclick = ()=>showLogin();
+  document.getElementById('bDarienCompleteCounts').onclick = ()=>showDarienBreadCountScreen();
+}
+
+function showDarienBreadCateringScreen(){
+  const vk = activeVendor;
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:18px;">Do you have any caterings tomorrow?</div>
+      <div class="LocBlock" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+        <button class="B B-red B-lg" style="width:100%;" id="bDarienCatYes">Yes</button>
+        <button class="B B-outline B-lg" style="width:100%;" id="bDarienCatNo">No</button>
+      </div>
+    </div>
+    <div class="Footer no-print"><button class="B B-outline" style="width:100%;" id="bDarienCatBack">← Back to Counts</button></div>`;
+  document.getElementById('bDarienCatBack').onclick = ()=>showDarienBreadCountScreen();
+  document.getElementById('bDarienCatNo').onclick = ()=>{ darienCatering = {}; applyDarienCatering(vk); showDarienBreadConfirmScreen(); };
+  document.getElementById('bDarienCatYes').onclick = ()=>showDarienBreadCateringEntry();
+}
+
+function showDarienBreadCateringEntry(){
+  const vk = activeVendor;
+  const names = VENDORS.bread.items.filter(i=>i.loc==='Line').map(i=>i.item);
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Catering</div>
+      <div style="font-size:13px;color:#777;margin-bottom:18px;">Enter how much of each you need for catering. It gets added on top of your order.</div>
+      <div class="LocBlock">
+        ${names.map(name=>`
+          <div class="ProdRow">
+            <div class="ProdRow-info"><div class="ProdRow-name">${name}</div></div>
+            <div class="DualInput">
+              <div class="IG"><label>Catering</label>
+                <input class="SI${darienCatering[name]?' filled':''}" type="number" min="0" step="any" inputmode="decimal"
+                  data-dcat="${name}" value="${darienCatering[name]||''}" placeholder="0">
+              </div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="Footer no-print" style="display:flex;gap:8px;">
+      <button class="B B-outline" style="flex:1;" id="bDarienCatEntryBack">← Back</button>
+      <button class="B B-red" style="flex:2;" id="bDarienCatContinue">Continue →</button>
+    </div>`;
+  document.getElementById('bDarienCatEntryBack').onclick = ()=>showDarienBreadCateringScreen();
+  document.getElementById('bDarienCatContinue').onclick = ()=>{
+    darienCatering = {};
+    document.querySelectorAll('[data-dcat]').forEach(inp=>{
+      const q = parseFloat(inp.value);
+      if(!isNaN(q) && q>0) darienCatering[inp.dataset.dcat] = q;
+    });
+    applyDarienCatering(vk);
     showDarienBreadConfirmScreen();
   };
+}
+
+function showDarienBreadFinalScreen(){
+  const vk = activeVendor;
+  const items = VENDORS.bread.items;
+  const orderedItems = items.filter(item=>{
+    const or = getC(vk, item, 'order');
+    return or !== '' && or !== '0';
+  });
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Bread</div>
+      <div class="H-right"></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Order Complete</div>
+      <div class="LocBlock">
+        ${orderedItems.length===0 ? `<div style="padding:16px;color:#777;">Nothing to order — everything's at par.</div>` :
+          orderedItems.map(item=>`
+            <div class="ProdRow">
+              <div class="ProdRow-info">
+                <div class="ProdRow-name">${item.item}</div>
+                <div class="ProdRow-meta">${item.loc}${(item.loc==='Line' && darienCateringApplied[item.item]) ? ' · includes '+darienCateringApplied[item.item]+' catering' : ''}</div>
+              </div>
+              <div style="font-weight:700;font-size:16px;color:#C8102E;">×${getC(vk,item,'order')}</div>
+            </div>`).join('')}
+      </div>
+    </div>
+    <div class="Footer no-print" style="display:flex;gap:8px;">
+      <button class="B B-outline" style="flex:1;" id="bDarienFinalHome">← Home</button>
+      <button class="B B-red" style="flex:2;" id="bDarienFinalPrint">🖨 Print</button>
+    </div>`;
+  document.getElementById('bDarienFinalHome').onclick = ()=>showLogin();
+  document.getElementById('bDarienFinalPrint').onclick = ()=>doPrint(vk, 'orderonly');
 }
 
 function showDarienBreadConfirmScreen(){
@@ -2058,7 +2192,7 @@ function showDarienBreadConfirmScreen(){
             <div class="ProdRow">
               <div class="ProdRow-info">
                 <div class="ProdRow-name">${item.item}</div>
-                <div class="ProdRow-meta">${item.loc}</div>
+                <div class="ProdRow-meta">${item.loc}${(item.loc==='Line' && darienCateringApplied[item.item]) ? ' · includes '+darienCateringApplied[item.item]+' catering' : ''}</div>
               </div>
               <div style="font-weight:700;font-size:16px;color:#C8102E;">×${getC(vk,item,'order')}</div>
             </div>`).join('')}
@@ -2073,7 +2207,7 @@ function showDarienBreadConfirmScreen(){
   document.getElementById('bDarienBreadEdit').onclick = ()=>showDarienBreadEditScreen();
   document.getElementById('bDarienBreadBack2').onclick = ()=>showDarienBreadCountScreen();
   document.getElementById('bDarienBreadComplete').onclick = async ()=>{
-    await finishOrderComplete(vk);
+    await finishOrderComplete(vk, showDarienBreadFinalScreen);
   };
 }
 
@@ -2180,12 +2314,13 @@ function startDarienBreadOrder(tag){
   if(!completedToday){
     counts[vk] = {};
     completed[vk] = null;
+    darienCatering = {}; darienCateringApplied = {};
     saveState();
   }
   const s = sess[vk];
   if(s && isSessionFromToday(s)){
     sessionUser=s.user; currentDate=s.orderDate; deliveryDate=s.deliveryDate;
-    showDarienBreadCountScreen();
+    showDarienBreadStartScreen();
   } else {
     pendingDarienBreadCount = true;
     showVerify(vk);
@@ -2386,7 +2521,8 @@ function usToISO(us){
   return `${p[2]}-${p[0]}-${p[1]}`;
 }
 
-async function finishOrderComplete(vk){
+async function finishOrderComplete(vk, onDone){
+  const goNext = onDone || showLogin;
   completed[vk] = new Date().toISOString();
   saveState();
   const todayISO = localISO(new Date()); // dashboard always checks against real completion date, local time
@@ -2412,13 +2548,13 @@ async function finishOrderComplete(vk){
     showModal('⚠ Order Not Saved',
       'This order could not be saved to the shared log — check your internet connection. Your counts are still here on this device. Tap Retry to try again, or Save Locally Only to continue (you\'ll need to report this order manually).',
       [
-        {l:'Save Locally Only', c:'B-outline', fn:()=>{ closeModal(); showLogin(); }},
-        {l:'Retry', c:'B-red', fn: async ()=>{ closeModal(); await finishOrderComplete(vk); }}
+        {l:'Save Locally Only', c:'B-outline', fn:()=>{ closeModal(); goNext(); }},
+        {l:'Retry', c:'B-red', fn: async ()=>{ closeModal(); await finishOrderComplete(vk, onDone); }}
       ]
     );
     return;
   }
-  showLogin();
+  goNext();
 }
 
 function showSchoolSuppliesEntry(vk){
@@ -3547,7 +3683,7 @@ function showDateEntry(vk, user){
       showWmReviewScreen();
     } else if(pendingDarienBreadCount){
       pendingDarienBreadCount = false;
-      showDarienBreadCountScreen();
+      showDarienBreadStartScreen();
     } else if(vk.startsWith('bread') && currentLoc==='westmont'){
       if(wmStandardOrderPending){
         wmStandardOrderPending = false;
