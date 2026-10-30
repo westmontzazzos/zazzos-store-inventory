@@ -802,7 +802,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '18.8';
+const APP_VERSION = '18.9';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -2037,6 +2037,7 @@ function darienAutoOrder(item, parField, ohValue){
 }
 
 function showDarienBreadCountScreen(){
+  darienScrollTop();
   const vk = activeVendor;
   stripDarienCatering(vk);
   const parField = darienBreadParFieldForVk(vk);
@@ -2137,7 +2138,15 @@ function applyDarienCatering(vk){
   });
 }
 
+function darienScrollTop(){
+  window.scrollTo(0,0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+  requestAnimationFrame(()=>{ window.scrollTo(0,0); });
+}
+
 function showDarienBreadStartScreen(){
+  darienScrollTop();
   app.innerHTML = `
     <header class="H no-print">
       <div class="H-logo">Bread</div>
@@ -2154,6 +2163,7 @@ function showDarienBreadStartScreen(){
 }
 
 function showDarienBreadCateringScreen(){
+  darienScrollTop();
   const vk = activeVendor;
   app.innerHTML = `
     <header class="H no-print">
@@ -2174,6 +2184,7 @@ function showDarienBreadCateringScreen(){
 }
 
 function showDarienBreadCateringEntry(){
+  darienScrollTop();
   const vk = activeVendor;
   const names = VENDORS.bread.items.filter(i=>i.loc==='Line').map(i=>i.item);
   app.innerHTML = `
@@ -2239,6 +2250,7 @@ function showDarienBreadAfterComplete(vk){
 }
 
 function showDarienSaturdayFinalScreen(){
+  darienScrollTop();
   const items = VENDORS.bread.items;
   const sections = [['bread_sunday','Sunday Delivery'],['bread_monday','Monday Delivery']];
   const body = sections.map(([svk,label])=>{
@@ -2283,6 +2295,7 @@ function showDarienSaturdayFinalScreen(){
 }
 
 function showDarienBreadFinalScreen(){
+  darienScrollTop();
   const vk = activeVendor;
   const items = VENDORS.bread.items;
   const orderedItems = darienBreadTotals(vk, false);
@@ -2314,6 +2327,7 @@ function showDarienBreadFinalScreen(){
 }
 
 function showDarienBreadConfirmScreen(){
+  darienScrollTop();
   const vk = activeVendor;
   const items = VENDORS.bread.items;
   const orderedItems = darienBreadTotals(vk, false);
@@ -2353,6 +2367,7 @@ function showDarienBreadConfirmScreen(){
 }
 
 function showDarienBreadEditScreen(){
+  darienScrollTop();
   const vk = activeVendor;
   const items = VENDORS.bread.items;
 
