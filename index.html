@@ -802,7 +802,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '18.7';
+const APP_VERSION = '18.8';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -1966,6 +1966,69 @@ function showDarienBreadcrumbsExplainer(onDismissForever, onContinue){
   };
 }
 
+const DARIEN_BREAD_ORDER_LIST = ['Filone','Extra Longs','Hamburger Buns','4 Inch Rolls','Sourdough Torpedo'];
+
+// One total per bread = Cooler order + Line order (catering is already inside the Line order)
+function darienBreadTotals(vk, includeZero){
+  return DARIEN_BREAD_ORDER_LIST.map(name=>{
+    const total = VENDORS.bread.items.filter(i=>i.item===name)
+      .reduce((s,r)=>s+(Number(getC(vk,r,'order'))||0), 0);
+    return {item:name, total};
+  }).filter(r=>includeZero || r.total>0);
+}
+
+// Same thing for saved rows coming back from the database (one row per location per bread)
+function combineDarienBreadRows(rows){
+  const byName = {}, extras = [];
+  rows.forEach(r=>{
+    const nm = r.item || '';
+    if(nm.startsWith('[ADD-ON]')){ extras.push({item:nm.replace('[ADD-ON] ',''), qty:Number(r.qty)||0}); return; }
+    byName[nm] = (byName[nm]||0) + (Number(r.qty)||0);
+  });
+  const items = DARIEN_BREAD_ORDER_LIST.filter(n=>byName[n]!==undefined).map(n=>({item:n, qty:byName[n]}));
+  Object.keys(byName).forEach(n=>{ if(!DARIEN_BREAD_ORDER_LIST.includes(n)) items.push({item:n, qty:byName[n]}); });
+  return {items, extras};
+}
+
+function historyShownItems(b){
+  if(b.store==='darien' && (b.vendor||'').startsWith('Bread')){
+    const c = combineDarienBreadRows(b.items.filter(i=>Number(i.qty)>0));
+    return c.items.map(r=>({item:r.item, qty:r.qty})).concat(c.extras.map(e=>({item:'[ADD-ON] '+e.item, qty:e.qty})));
+  }
+  return b.items;
+}
+
+function printDarienBreadOrder(vk, mode){
+  const v = vdef(vk);
+  const rows = darienBreadTotals(vk, mode==='full');
+  const adds = (addons[vk]||[]);
+  const td = 'padding:7px 12px;border:1px solid #DDD;font-size:14px;';
+  const qtyStyle = td+'text-align:center;font-weight:700;font-size:16px;color:#C8102E;';
+  const body = rows.map(r=>`<tr><td style="${td}">${r.item}</td><td style="${qtyStyle}">${r.total}</td></tr>`).join('')
+    + adds.map(a=>`<tr><td style="${td}">${a.name} (add-on)</td><td style="${qtyStyle}">${a.qty}</td></tr>`).join('');
+  const empty = `<tr><td colspan="2" style="padding:10px;color:#777;">Nothing to order.</td></tr>`;
+  document.getElementById('print-area').innerHTML = `
+    <div style="font-family:'Inter',system-ui,sans-serif;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1A1A2E;padding-bottom:4px;margin-bottom:10px;">
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:0.05em;font-family:'Libre Baskerville',Georgia,serif;">ZAZZO'S DARIEN INVENTORY</div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#333;margin-top:2px;">${v.name} — ORDER TOTALS</div>
+        </div>
+        <div style="text-align:right;font-size:9px;color:#555;line-height:1.7;">
+          <div>Order Date: ${currentDate||'—'}</div>
+          <div>Delivery Date: ${deliveryDate||'—'}</div>
+          <div>Counted by: ${sessionUser||'—'}</div>
+        </div>
+      </div>
+      <table style="width:100%;border-collapse:collapse;"><tbody>
+        <tr><td style="${td}background:#1A1A2E;color:#fff;font-weight:700;font-size:10px;text-transform:uppercase;">Item</td><td style="${td}background:#1A1A2E;color:#fff;font-weight:700;font-size:10px;text-transform:uppercase;text-align:center;">Total to Order</td></tr>
+        ${body || empty}
+      </tbody></table>
+    </div>`;
+  logOrderToCloud(vk, 'orderonly');
+  setTimeout(()=>{ window.print(); }, 150);
+}
+
 function darienAutoOrder(item, parField, ohValue){
   const oh = parseFloat(ohValue);
   if(isNaN(oh)) return '';
@@ -2180,21 +2243,15 @@ function showDarienSaturdayFinalScreen(){
   const sections = [['bread_sunday','Sunday Delivery'],['bread_monday','Monday Delivery']];
   const body = sections.map(([svk,label])=>{
     ensureBreadAliasState(svk);
-    const ordered = items.filter(item=>{
-      const or = getC(svk, item, 'order');
-      return or !== '' && or !== '0';
-    });
+    const ordered = darienBreadTotals(svk, false);
     return `
       <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:16px;font-weight:700;margin:6px 0 8px;">${label}</div>
       <div class="LocBlock" style="margin-bottom:14px;">
         ${ordered.length===0 ? `<div style="padding:16px;color:#777;">Nothing to order — everything's at par.</div>` :
-          ordered.map(item=>`
+          ordered.map(r=>`
             <div class="ProdRow">
-              <div class="ProdRow-info">
-                <div class="ProdRow-name">${item.item}</div>
-                <div class="ProdRow-meta">${item.loc}</div>
-              </div>
-              <div style="font-weight:700;font-size:16px;color:#C8102E;">×${getC(svk,item,'order')}</div>
+              <div class="ProdRow-info"><div class="ProdRow-name">${r.item}</div></div>
+              <div style="font-weight:700;font-size:16px;color:#C8102E;">×${r.total}</div>
             </div>`).join('')}
       </div>`;
   }).join('');
@@ -2228,10 +2285,7 @@ function showDarienSaturdayFinalScreen(){
 function showDarienBreadFinalScreen(){
   const vk = activeVendor;
   const items = VENDORS.bread.items;
-  const orderedItems = items.filter(item=>{
-    const or = getC(vk, item, 'order');
-    return or !== '' && or !== '0';
-  });
+  const orderedItems = darienBreadTotals(vk, false);
   app.innerHTML = `
     <header class="H no-print">
       <div class="H-logo">Bread</div>
@@ -2241,13 +2295,13 @@ function showDarienBreadFinalScreen(){
       <div style="background:#1B6B3A;color:#fff;font-size:12px;font-weight:700;text-align:center;padding:8px 12px;border-radius:6px;margin-bottom:16px;letter-spacing:.04em;text-transform:uppercase;">Order Complete</div>
       <div class="LocBlock">
         ${orderedItems.length===0 ? `<div style="padding:16px;color:#777;">Nothing to order — everything's at par.</div>` :
-          orderedItems.map(item=>`
+          orderedItems.map(r=>`
             <div class="ProdRow">
               <div class="ProdRow-info">
-                <div class="ProdRow-name">${item.item}</div>
-                <div class="ProdRow-meta">${item.loc}${(item.loc==='Line' && darienCateringApplied[item.item]) ? ' · includes '+darienCateringApplied[item.item]+' catering' : ''}</div>
+                <div class="ProdRow-name">${r.item}</div>
+                ${darienCateringApplied[r.item] ? `<div class="ProdRow-meta">includes ${darienCateringApplied[r.item]} catering</div>` : ''}
               </div>
-              <div style="font-weight:700;font-size:16px;color:#C8102E;">×${getC(vk,item,'order')}</div>
+              <div style="font-weight:700;font-size:16px;color:#C8102E;">×${r.total}</div>
             </div>`).join('')}
       </div>
     </div>
@@ -2262,10 +2316,7 @@ function showDarienBreadFinalScreen(){
 function showDarienBreadConfirmScreen(){
   const vk = activeVendor;
   const items = VENDORS.bread.items;
-  const orderedItems = items.filter(item => {
-    const or = getC(vk, item, 'order');
-    return or !== '' && or !== '0';
-  });
+  const orderedItems = darienBreadTotals(vk, false);
 
   app.innerHTML = `
     <header class="H no-print">
@@ -2278,13 +2329,13 @@ function showDarienBreadConfirmScreen(){
       <div style="font-size:13px;color:#777;margin-bottom:18px;">Review before finalizing. Tap Edit to adjust quantities.</div>
       <div class="LocBlock">
         ${orderedItems.length===0 ? `<div style="padding:16px;color:#777;">No items to order — everything's at par.</div>` :
-          orderedItems.map(item=>`
+          orderedItems.map(r=>`
             <div class="ProdRow">
               <div class="ProdRow-info">
-                <div class="ProdRow-name">${item.item}</div>
-                <div class="ProdRow-meta">${item.loc}${(item.loc==='Line' && darienCateringApplied[item.item]) ? ' · includes '+darienCateringApplied[item.item]+' catering' : ''}</div>
+                <div class="ProdRow-name">${r.item}</div>
+                ${darienCateringApplied[r.item] ? `<div class="ProdRow-meta">includes ${darienCateringApplied[r.item]} catering</div>` : ''}
               </div>
-              <div style="font-weight:700;font-size:16px;color:#C8102E;">×${getC(vk,item,'order')}</div>
+              <div style="font-weight:700;font-size:16px;color:#C8102E;">×${r.total}</div>
             </div>`).join('')}
       </div>
     </div>
@@ -2880,7 +2931,7 @@ async function showOrderHistory(){
           showModal(`${b.store.charAt(0).toUpperCase()+b.store.slice(1)} · ${b.vendor} — ${b.date||'—'}`,
             `<div style="text-align:left;font-size:13px;max-height:320px;overflow-y:auto;">
               <div style="color:#777;margin-bottom:8px;">Counted by ${b.by||'—'} · Total qty ${b.qty}</div>
-              ${b.items.map(i=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F0F0F0;"><span>${i.item}</span><strong style="color:#C8102E;">×${i.qty}</strong></div>`).join('')}
+              ${historyShownItems(b).map(i=>`<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #F0F0F0;"><span>${i.item}</span><strong style="color:#C8102E;">×${i.qty}</strong></div>`).join('')}
             </div>`,
             [
               {l:'🖨 Print', c:'B-outline', fn:()=>{ closeModal(); printHistoricalOrder(b); }},
@@ -4588,6 +4639,34 @@ function printHistoricalOrder(b){
     return;
   }
 
+  if(b.store==='darien' && b.vendor && b.vendor.startsWith('Bread')){
+    const c = combineDarienBreadRows(b.items.filter(i=>Number(i.qty)>0));
+    const td = 'padding:7px 12px;border:1px solid #DDD;font-size:14px;';
+    const qtyStyle = td+'text-align:center;font-weight:700;font-size:16px;color:#C8102E;';
+    const body = c.items.map(r=>`<tr><td style="${td}">${r.item}</td><td style="${qtyStyle}">${r.qty}</td></tr>`).join('')
+      + c.extras.map(e=>`<tr><td style="${td}">${e.item} (add-on)</td><td style="${qtyStyle}">${e.qty}</td></tr>`).join('');
+    document.getElementById('print-area').innerHTML = `
+      <div style="font-family:'Inter',system-ui,sans-serif;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #1A1A2E;padding-bottom:4px;margin-bottom:10px;">
+          <div>
+            <div style="font-size:14px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:0.05em;font-family:'Libre Baskerville',Georgia,serif;">ZAZZO'S DARIEN INVENTORY</div>
+            <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#333;margin-top:2px;">${b.vendor} — REPRINT — ORDER TOTALS</div>
+          </div>
+          <div style="text-align:right;font-size:9px;color:#555;line-height:1.7;">
+            <div>Order Date: ${b.date||'—'}</div>
+            <div>Counted by: ${b.by||'—'}</div>
+            <div>Completed: ${new Date(b.created).toLocaleString()}</div>
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;"><tbody>
+          <tr><td style="${td}background:#1A1A2E;color:#fff;font-weight:700;font-size:10px;text-transform:uppercase;">Item</td><td style="${td}background:#1A1A2E;color:#fff;font-weight:700;font-size:10px;text-transform:uppercase;text-align:center;">Total to Order</td></tr>
+          ${body || '<tr><td colspan="2" style="padding:10px;color:#777;">Nothing to order.</td></tr>'}
+        </tbody></table>
+      </div>`;
+    setTimeout(()=>{ window.print(); }, 150);
+    return;
+  }
+
   const vk = Object.keys(VENDORS).find(k=>VENDORS[k].name===b.vendor) || Object.keys(VENDORS).find(k=>b.vendor.startsWith(VENDORS[k].name));
   const isDarien = b.store==='darien';
 
@@ -4720,6 +4799,7 @@ function printHistoricalOrder(b){
 function doPrint(vk, mode){
   // mode: 'blank' | 'full' | 'orderonly'
   const v=vdef(vk), locs=getLocs(vk);
+  if(currentLoc==='darien' && vk.startsWith('bread') && mode!=='blank'){ printDarienBreadOrder(vk, mode); return; }
   const date=new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'});
   let tableRows='';
   if(currentLoc==='darien'){
