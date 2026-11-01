@@ -807,7 +807,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '19.0';
+const APP_VERSION = '19.1';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -4276,6 +4276,24 @@ function showCount(){
         'Bar Fruit - Olives',
         'Check Books'
       ]);
+
+      // Darien Greco — pizza circles & folders: same math as Westmont (Order = Par − Count, never below 0).
+      // Every other Darien item stays manual.
+      const DARIEN_PIZZA_PAPER_ITEMS = new Set([
+        '10" Circle','12" Circle','14" Circle','16" Circle','18" Circle',
+        '7" Folders','12" Folders','14" Folders','16" Folders','18" Folders'
+      ]);
+      if(f==='oh' && currentLoc==='darien' && v2==='greco' && input.value!=='' && DARIEN_PIZZA_PAPER_ITEMS.has(item.item)){
+        const parNum = parseFloat(item.par);
+        const ohNum = parseFloat(input.value)||0;
+        const suggestedOrder = (!isNaN(parNum) && parNum>0 && ohNum < parNum) ? Math.round(parNum - ohNum) : 0;
+        setC(v2, item, 'order', String(suggestedOrder));
+        const orderInput = allInputs.find(x=>x.dataset.vk===v2 && x.dataset.loc===loc && x.dataset.idx===idx && x.dataset.f==='order');
+        if(orderInput){
+          orderInput.value = suggestedOrder;
+          orderInput.classList.toggle('filled', suggestedOrder>0);
+        }
+      }
 
       if(f==='oh' && currentLoc==='westmont' && v2==='greco' && input.value!==''){
         let suggestedOrder = null;
