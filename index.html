@@ -104,7 +104,7 @@
       #print-area table{width:100%!important;border-collapse:collapse!important;table-layout:fixed!important;}
       #print-area table{page-break-inside:auto;}
       #print-area tr{page-break-inside:avoid;page-break-after:auto;height:auto!important;}
-      #print-area td{line-height:1.4!important;vertical-align:middle!important;overflow:visible!important;}
+      #print-area td{line-height:1.25!important;vertical-align:middle!important;overflow:visible!important;}
       #print-area thead{display:table-header-group;}
     }
   </style>
@@ -809,7 +809,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '19.2';
+const APP_VERSION = '19.3';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -2034,6 +2034,12 @@ function printDarienBreadOrder(vk, mode){
     </div>`;
   logOrderToCloud(vk, 'orderonly');
   setTimeout(()=>{ window.print(); }, 150);
+}
+
+function printColgroup(isDarienSheet){
+  return isDarienSheet
+    ? '<colgroup><col style="width:38%"><col style="width:16%"><col style="width:16%"><col style="width:15%"><col style="width:15%"></colgroup>'
+    : '<colgroup><col style="width:55%"><col style="width:25%"><col style="width:20%"></colgroup>';
 }
 
 function darienAutoOrder(item, parField, ohValue){
@@ -4829,7 +4835,7 @@ function printHistoricalOrder(b){
         </div>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed;">
-        <tbody>${tableRows}</tbody>
+        ${printColgroup(isDarien)}<tbody>${tableRows}</tbody>
       </table>
       ${alertHTML}
     </div>`;
@@ -4983,6 +4989,10 @@ function doPrint(vk, mode){
     </div>` : '';
 
   const subtitle = mode==='blank' ? 'BLANK SHEET' : mode==='orderonly' ? 'ORDER ONLY' : 'FULL SHEET';
+  // Check line: counts come from the same data the sheet is built from, so a missing row is obvious
+  const _orderedLines = vdef(vk).items.filter(i=>i.loc!=='School Supplies' && getC(vk,i,'order')!=='' && getC(vk,i,'order')!=='0').length;
+  const _addonLines = (addons[vk]||[]).length;
+  const checkLine = mode==='blank' ? '' : `${_orderedLines} item${_orderedLines===1?'':'s'} ordered · ${_addonLines} add-on${_addonLines===1?'':'s'}`;
 
   document.getElementById('print-area').innerHTML=`
     <div style="font-family:'Inter',system-ui,sans-serif;font-size:9px;">
@@ -4995,9 +5005,11 @@ function doPrint(vk, mode){
           <div>Order Date: ${mode==='blank'?'_________________':currentDate||date}</div>
           <div>Delivery Date: ${mode==='blank'?'_________________':deliveryDate||'_________________'}</div>
           <div>Counted by: ${mode==='blank'?'_________________':sessionUser||'_________________'}</div>
+          ${mode==='blank' ? '' : `<div style="font-weight:700;color:#111;">${checkLine}</div>`}
         </div>
       </div>
-      <table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed;"><tbody>${tableRows}</tbody></table>
+      <table style="width:100%;border-collapse:collapse;font-size:9px;table-layout:fixed;">${printColgroup(currentLoc==='darien')}<tbody>${tableRows}</tbody></table>
+      ${mode==='blank' ? '' : `<div style="margin-top:8px;font-size:9px;font-weight:700;text-align:center;color:#555;">— END OF ORDER · ${checkLine} · v${APP_VERSION} —</div>`}
       ${alertHTML}
       ${corrHTML}
     </div>`;
