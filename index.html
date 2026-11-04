@@ -809,7 +809,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '19.4';
+const APP_VERSION = '19.5';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -981,6 +981,7 @@ function showLogin(){
       </div>
       <button class="B B-outline" style="width:100%;max-width:320px;margin-top:8px;" id="bPrintTodayBtn">🖨 Print Today's Orders</button>
       <button class="B B-outline" style="width:100%;max-width:320px;margin-top:8px;" id="bWeeklyBreadBtn">📅 Weekly Bread Summary</button>
+      <button class="B B-outline" style="width:100%;max-width:320px;margin-top:8px;" id="bGuideHome">✎ Edit Guide — pars &amp; item numbers</button>
     </div>`;
 
 
@@ -1011,6 +1012,7 @@ function showLogin(){
   document.getElementById('bFlagIssueBtn')?.addEventListener('click',()=>{ showIssueNote(); });
   document.getElementById('bPrintTodayBtn')?.addEventListener('click',()=>{ showPrintTodayScreen(); });
   document.getElementById('bWeeklyBreadBtn')?.addEventListener('click',()=>{ showWeeklyBreadSummary(); });
+  document.getElementById('bGuideHome')?.addEventListener('click',()=>requireGuideCode(()=>showGuideVendorPicker()));
   document.querySelectorAll('.LCard[data-vk]').forEach(el=>{
     el.onclick=()=>{
       activeVendor=el.dataset.vk;
@@ -1191,7 +1193,7 @@ const WM_FREEZER_ITEMS = [
   {item:'4 Inch Rolls', par:4},
   {item:'Sourdough Torpedo', par:4},
 ];
-const WM_BREAD_CRUMBS_PAR = 1;
+let WM_BREAD_CRUMBS_PAR = 1;
 const WM_BREAD_CRUMBS_LOW_THRESHOLD = 0.25;
 const WM_CASE_RULE_ITEMS_TOP = {
   'Spring Mix':3, 'App - Fried Mush':4, 'App - Fried Zucc':4,
@@ -1298,7 +1300,24 @@ function wmApplyStandardOrder(vk){
 }
 
 // Fixed pars
-function wmLineDayPar(dow2){ return (dow2>=1 && dow2<=4) ? 2 : 3; } // Hamburger Buns / Filone: Mon-Thu=2, Fri-Sun=3
+// Hamburger Buns / Filone on the Line, by day (0=Sun..6=Sat). Defaults: Mon-Thu=2, Fri-Sun=3. Editable in Edit Guide.
+const WM_LINE_DAY_PAR = {0:3, 1:2, 2:2, 3:2, 4:2, 5:3, 6:3};
+function wmLineDayPar(dow2){ return WM_LINE_DAY_PAR[dow2]; }
+const WM_STANDING_DEFAULTS = JSON.parse(JSON.stringify(WM_LINE_STANDING));
+const WM_LINE_DAY_PAR_DEFAULTS = Object.assign({}, WM_LINE_DAY_PAR);
+// Keep the Westmont count list in step with the Freezer pars in the bread data
+function wmSyncBreadPars(){
+  if(!DATA || !DATA.westmont) return;
+  const items = DATA.westmont.bread.items;
+  WM_ALL_COUNT_ITEMS.forEach(r=>{
+    if(r.par===null) return;
+    const it = items.find(i=>i.loc===r.loc && i.item===r.item);
+    const n = it ? Number(it.par) : NaN;
+    if(!isNaN(n)) r.par = n;
+  });
+  const bc = items.find(i=>i.loc==='Freezer' && i.item==='Bread Crumbs');
+  if(bc && !isNaN(Number(bc.par))) WM_BREAD_CRUMBS_PAR = Number(bc.par);
+}
 
 const WM_ALL_COUNT_ITEMS = [
   {loc:'Freezer', item:'Hamburger Buns', par:3},
@@ -4002,7 +4021,7 @@ function showCount(){
   // Greco only: hold an item's name for 5 seconds to edit its name and item number
   document.getElementById('bBlank').addEventListener('click',()=>doPrint(vk,'blank'));
   document.getElementById('bWeeklyForm')?.addEventListener('click',()=>printWeeklyBlankSheet(vk));
-  document.getElementById('bGuideEdit')?.addEventListener('click',()=>requireGuideCode(()=>showGuideEditor(vk)));
+  document.getElementById('bGuideEdit')?.addEventListener('click',()=>requireGuideCode(()=>{ guideReturn = 'count'; showGuideEditor(vk); }));
   document.getElementById('bWeeklyCounts')?.addEventListener('click',()=>showWeeklyCountsScreen());
   document.getElementById('bClear').onclick=()=>{
     showModal('Clear All Counts','This will erase all entries for '+v.name+'. Are you sure?',[
@@ -4550,8 +4569,13 @@ const GUIDE_CODE = '1234';
 let guideUnlocked = false;
 const GUIDE_REMOVED = {};   // "store|vendor" -> [{item}] items taken off the guide (can be restored)
 
-function guideEnsureOrig(it){ if(!it._o) it._o = {item:it.item, num:it.num, par:it.par}; }
-function guideIsModified(it){ guideEnsureOrig(it); return it.item!==it._o.item || it.num!==it._o.num || it.par!==it._o.par; }
+function guideEnsureOrig(it){
+  if(it._o) return;
+  const o = {item:it.item, num:it.num, par:it.par};
+  Object.keys(it).forEach(k=>{ if(/^par[A-Z]/.test(k)) o[k] = it[k]; });   // bread: parMon, parTue ...
+  it._o = o;
+}
+function guideIsModified(it){ guideEnsureOrig(it); return Object.keys(it._o).some(k=>it[k]!==it._o[k]); }
 function escAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
 
 function guideInsertItem(vo, it){
@@ -4578,6 +4602,16 @@ async function applySavedItemEdits(loc){
     if(!res.ok) return;
     const edits = await res.json();
     edits.forEach(e=>{
+      if(e.store && e.store!==loc) return;          // never apply another store's rows
+      if(e.loc==='__wm_standing__'){                // Westmont bread: standing order / line pars by day
+        if(loc!=='westmont') return;
+        let ex = null; try{ ex = JSON.parse(e.new_num); }catch(_){}
+        if(!ex || !Array.isArray(ex.days) || ex.days.length!==7) return;
+        const days = ex.days.map(Number);
+        if(e.original_item==='__LINE_DAY_PAR__'){ days.forEach((n,d)=>{ if(!isNaN(n)) WM_LINE_DAY_PAR[d] = n; }); }
+        else if(WM_LINE_STANDING[e.original_item]){ days.forEach((n,d)=>{ if(!isNaN(n)) WM_LINE_STANDING[e.original_item][d] = n; }); }
+        return;
+      }
       const vo = DATA[loc][e.vendor];
       if(!vo || !vo.items) return;
       let extra = null;
@@ -4607,12 +4641,12 @@ async function applySavedItemEdits(loc){
 
       item.item = e.new_item;                       // name / number / par change
       if(extra){
-        if(extra.num!==undefined) item.num = extra.num;
-        if(extra.par!==undefined) item.par = extra.par;
+        Object.keys(extra).forEach(k=>{ if(k==='num') item.num = extra.num; else if(/^par/.test(k)) item[k] = extra[k]; });
       } else {
         item.num = e.new_num || '—';                // older rows: plain number
       }
     });
+    if(loc==='westmont') wmSyncBreadPars();
   }catch(err){}
 }
 
@@ -4644,7 +4678,7 @@ async function guideApplyEdit(vk, it, name, num, par){
 }
 async function guideResetItem(vk, it){
   const oldKey = ikey(it);
-  it.item = it._o.item; it.num = it._o.num; it.par = it._o.par;
+  Object.keys(it._o).forEach(k=>{ if(it._o[k]!==undefined) it[k] = it._o[k]; });
   guideMigrateCounts(vk, oldKey, ikey(it));
   return guideSaveRow(vk, it.loc, it._o.item, it.item, null);
 }
@@ -4666,6 +4700,200 @@ async function guideRestoreItem(vk, i){
   const ok = await guideSaveRow(vk, it.loc, it._o.item, it.item, guideIsModified(it) ? JSON.stringify({num:it.num, par:it.par}) : null);
   guideWarnIfFailed(ok);
   showGuideEditor(vk);
+}
+
+
+// ─── EDIT GUIDE — BREAD (item numbers, pars by day, Westmont standing order) ──
+let guideReturn = 'count';   // where Back / Done go: 'count' (vendor screen) or 'home' (Home → Edit Guide)
+const BREAD_DOW_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const BREAD_EDIT_ORDER = {
+  darien:   ['Filone','Extra Longs','Hamburger Buns','4 Inch Rolls','Sourdough Torpedo'],
+  westmont: ['Hamburger Buns','Filone','4 Inch Rolls','Sourdough Torpedo','Bread Crumbs','Extra Longs']
+};
+
+function breadDayGrid(key, values){
+  return `<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;">${BREAD_DOW_SHORT.map((d,i)=>`
+    <div style="text-align:center;">
+      <div style="font-size:9px;font-weight:700;color:#999;text-transform:uppercase;margin-bottom:2px;">${d}</div>
+      <input type="number" min="0" step="any" inputmode="decimal" data-bgrid="${escAttr(key)}@${i}" value="${escAttr(values[i])}"
+        style="width:100%;padding:8px 2px;border:2px solid #E2E2E2;border-radius:6px;text-align:center;font-size:15px;font-weight:700;font-family:'Inter',sans-serif;">
+    </div>`).join('')}</div>`;
+}
+function breadSectionTitle(t){ return `<div style="font-size:11px;font-weight:700;color:#1B6B3A;text-transform:uppercase;letter-spacing:.05em;margin:12px 0 6px;">${t}</div>`; }
+
+function showBreadGuideEditor(){
+  const store = currentLoc;
+  const items = DATA[store].bread.items;
+  const lbl = 'font-size:12px;font-weight:700;color:#777;text-transform:uppercase;';
+  const inp = "width:100%;border:2px solid #E2E2E2;border-radius:8px;padding:10px;font-size:15px;margin:6px 0 4px;font-family:'Inter',sans-serif;";
+  const names = BREAD_EDIT_ORDER[store];
+  let body = '';
+
+  if(store==='westmont'){
+    body += `<div class="LocBlock" style="padding:12px 16px;margin-bottom:14px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:16px;font-weight:700;">Standing Order</div>
+      <div style="font-size:12px;color:#777;margin-top:2px;">What gets ordered on the Line when you choose Standard Order, by delivery day.</div>
+      ${['Extra Longs','Sourdough Torpedo'].map(n=>`${breadSectionTitle(n)}${breadDayGrid('stand:'+n, [0,1,2,3,4,5,6].map(d=>WM_LINE_STANDING[n][d]))}`).join('')}
+    </div>
+    <div class="LocBlock" style="padding:12px 16px;margin-bottom:14px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:16px;font-weight:700;">Line pars — Hamburger Buns &amp; Filone</div>
+      <div style="font-size:12px;color:#777;margin-top:2px;">By delivery day.</div>
+      ${breadDayGrid('lday', [0,1,2,3,4,5,6].map(d=>WM_LINE_DAY_PAR[d]))}
+    </div>
+    <div class="LocBlock" style="padding:12px 16px;margin-bottom:14px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:16px;font-weight:700;">Freezer pars</div>
+      ${items.filter(i=>i.loc==='Freezer').map(it=>`
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid #F0F0F0;margin-top:6px;">
+          <div class="ProdRow-name">${it.item}</div>
+          <input type="number" min="0" step="any" inputmode="decimal" data-bsingle="${escAttr(it.item)}" value="${escAttr(it.par)}"
+            style="width:80px;padding:8px;border:2px solid #E2E2E2;border-radius:6px;text-align:center;font-size:16px;font-weight:700;font-family:'Inter',sans-serif;">
+        </div>`).join('')}
+    </div>`;
+  } else {
+    body += names.map(n=>{
+      const rows = items.filter(i=>i.item===n);
+      if(!rows.length) return '';
+      return `<div class="LocBlock" style="padding:12px 16px;margin-bottom:14px;">
+        <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:16px;font-weight:700;">${n}</div>
+        ${rows.map(r=>`${breadSectionTitle(r.loc+' par by day')}${breadDayGrid('par:'+r.loc+'|'+n, BREAD_DAYS.map(f=>r[f]))}`).join('')}
+      </div>`;
+    }).join('');
+  }
+
+  // item numbers (one number per bread; applies to every row of that bread)
+  body += `<div class="LocBlock" style="padding:12px 16px;margin-bottom:14px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:16px;font-weight:700;">Item numbers</div>
+      <div style="font-size:12px;color:#777;margin-top:2px;">One number per bread (the bakery’s item number).</div>
+      ${names.map(n=>{
+        const r = items.find(i=>i.item===n);
+        return r ? `<label style="${lbl}display:block;margin-top:10px;">${n}</label>
+          <input type="text" data-bnum="${escAttr(n)}" value="${escAttr(r.num==='—'?'':r.num)}" placeholder="Item number" style="${inp}">` : '';
+      }).join('')}
+    </div>`;
+
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Edit Guide</div>
+      <div class="H-right"><button class="B B-ghost" id="bBreadGuideBack">← Back</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Bread — ${store==='westmont'?'Westmont':'Darien'}</div>
+      <div style="font-size:13px;color:#777;margin-bottom:16px;">Change numbers, then tap Save. Changes save for every phone — other phones pick them up the next time the app is opened.</div>
+      <div id="bgErr" style="color:#C8102E;font-size:13px;font-weight:700;min-height:18px;margin-bottom:6px;"></div>
+      ${body}
+      <button class="B B-outline" style="width:100%;margin-bottom:20px;" id="bBreadReset">↺ Reset all bread to original</button>
+    </div>
+    <div class="Footer no-print" style="display:flex;gap:8px;">
+      <button class="B B-outline" style="flex:1;" id="bBreadCancel">Cancel</button>
+      <button class="B B-red" style="flex:2;" id="bBreadSave">✓ Save</button>
+    </div>`;
+  window.scrollTo(0,0);
+  const leave = ()=>{ if(guideReturn==='home') showGuideVendorPicker(); else showLogin(); };
+  document.getElementById('bBreadGuideBack').onclick = leave;
+  document.getElementById('bBreadCancel').onclick = leave;
+  document.getElementById('bBreadSave').onclick = ()=>breadGuideSave(leave);
+  document.getElementById('bBreadReset').onclick = ()=>{
+    showModal('Reset bread?', `<div style="text-align:left;font-size:14px;line-height:1.5;">Put every bread number, par, and ${store==='westmont'?'the standing order ':''}back to the original values for ${store==='westmont'?'Westmont':'Darien'}?</div>`,
+      [{l:'Cancel',c:'B-outline',fn:closeModal},{l:'Reset',c:'B-red',fn:async ()=>{ closeModal(); const ok = await breadGuideResetAll(); guideWarnIfFailed(ok); showBreadGuideEditor(); }}]);
+  };
+}
+
+async function breadGuideSave(leave){
+  const store = currentLoc;
+  const items = DATA[store].bread.items;
+  const err = document.getElementById('bgErr');
+  const nums = [...document.querySelectorAll('[data-bgrid],[data-bsingle]')];
+  let bad = false;
+  nums.forEach(i=>{ const v = i.value.trim(); const bd = (v==='' || isNaN(Number(v)) || Number(v)<0); i.style.borderColor = bd ? '#C8102E' : '#E2E2E2'; if(bd) bad = true; });
+  if(bad){ err.textContent = 'Pars must be numbers (0 or more). Fix the red boxes.'; return; }
+  err.textContent = '';
+
+  const grid = {};                                           // key -> [7 values]
+  document.querySelectorAll('[data-bgrid]').forEach(i=>{ const [k,d] = i.dataset.bgrid.split('@'); (grid[k] = grid[k] || [])[+d] = String(Number(i.value.trim())); });
+  const single = {};
+  document.querySelectorAll('[data-bsingle]').forEach(i=>{ single[i.dataset.bsingle] = String(Number(i.value.trim())); });
+  const numOf = {};
+  document.querySelectorAll('[data-bnum]').forEach(i=>{ numOf[i.dataset.bnum] = i.value.trim() || '—'; });
+
+  let allOk = true;
+  const note = ok=>{ if(!ok) allOk = false; };
+
+  if(store==='westmont'){
+    for(const n of ['Extra Longs','Sourdough Torpedo']){                      // standing order
+      const days = grid['stand:'+n].map(Number);
+      const changed = days.some((v,d)=>WM_LINE_STANDING[n][d]!==v);
+      days.forEach((v,d)=>{ WM_LINE_STANDING[n][d] = v; });
+      if(changed){
+        const same = days.every((v,d)=>WM_STANDING_DEFAULTS[n][d]===v);
+        note(await guideSaveRow('bread','__wm_standing__',n,n, same ? null : JSON.stringify({days})));
+      }
+    }
+    { const days = grid['lday'].map(Number);                                  // line pars by day
+      const changed = days.some((v,d)=>WM_LINE_DAY_PAR[d]!==v);
+      days.forEach((v,d)=>{ WM_LINE_DAY_PAR[d] = v; });
+      if(changed){
+        const same = days.every((v,d)=>WM_LINE_DAY_PAR_DEFAULTS[d]===v);
+        note(await guideSaveRow('bread','__wm_standing__','__LINE_DAY_PAR__','__LINE_DAY_PAR__', same ? null : JSON.stringify({days})));
+      }
+    }
+  }
+
+  for(const it of items){                                                      // item numbers + pars on each row
+    guideEnsureOrig(it);
+    const before = JSON.stringify(Object.keys(it._o).map(k=>it[k]));
+    if(numOf[it.item]!==undefined) it.num = numOf[it.item];
+    if(store==='westmont'){
+      if(it.loc==='Freezer' && single[it.item]!==undefined) it.par = single[it.item];
+    } else {
+      const g = grid['par:'+it.loc+'|'+it.item];
+      if(g) BREAD_DAYS.forEach((f,d)=>{ it[f] = g[d]; });
+    }
+    const after = JSON.stringify(Object.keys(it._o).map(k=>it[k]));
+    if(before===after) continue;
+    if(!guideIsModified(it)){ note(await guideSaveRow('bread', it.loc, it._o.item, it.item, null)); continue; }
+    const payload = {num: it.num};
+    if(store==='westmont'){ payload.par = it.par; } else { BREAD_DAYS.forEach(f=>{ payload[f] = it[f]; }); }
+    note(await guideSaveRow('bread', it.loc, it._o.item, it.item, JSON.stringify(payload)));
+  }
+  if(store==='westmont') wmSyncBreadPars();
+  guideWarnIfFailed(allOk);
+  leave();
+}
+
+async function breadGuideResetAll(){
+  const store = currentLoc;
+  DATA[store].bread.items.forEach(it=>{ guideEnsureOrig(it); Object.keys(it._o).forEach(k=>{ if(it._o[k]!==undefined) it[k] = it._o[k]; }); });
+  if(store==='westmont'){
+    Object.keys(WM_STANDING_DEFAULTS).forEach(n=>{ Object.keys(WM_STANDING_DEFAULTS[n]).forEach(d=>{ WM_LINE_STANDING[n][d] = WM_STANDING_DEFAULTS[n][d]; }); });
+    Object.keys(WM_LINE_DAY_PAR_DEFAULTS).forEach(d=>{ WM_LINE_DAY_PAR[d] = WM_LINE_DAY_PAR_DEFAULTS[d]; });
+    wmSyncBreadPars();
+  }
+  try{
+    const r = await supa('item_edits?store=eq.'+encodeURIComponent(store)+'&vendor=eq.bread', {method:'DELETE'});
+    return !!(r && r.ok);
+  }catch(e){ return false; }
+}
+
+// Home → Edit Guide → pick a vendor
+function showGuideVendorPicker(){
+  guideReturn = 'home';
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Edit Guide</div>
+      <div class="H-right"><button class="B B-ghost" id="bGuidePickBack">← Home</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">Which guide?</div>
+      <div style="font-size:13px;color:#777;margin-bottom:16px;">${currentLoc==='westmont'?'Westmont':'Darien'} — pick a vendor to edit its pars and item numbers.</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        ${Object.keys(VENDORS).map(vk=>`<button class="B B-outline B-lg" style="width:100%;text-align:left;" data-gpick="${vk}">${VENDORS[vk].emoji} ${VENDORS[vk].name}</button>`).join('')}
+      </div>
+    </div>`;
+  window.scrollTo(0,0);
+  document.getElementById('bGuidePickBack').onclick = ()=>showLogin();
+  document.querySelectorAll('[data-gpick]').forEach(b=>{
+    b.onclick = ()=>{ const vk = b.dataset.gpick; guideReturn = 'home'; if(vk==='bread') showBreadGuideEditor(); else { activeVendor = vk; showGuideEditor(vk); } };
+  });
 }
 
 function requireGuideCode(onOk){
@@ -4739,8 +4967,9 @@ function showGuideEditor(vk){
     </div>
     <div class="Footer no-print"><button class="B B-red B-lg" style="width:100%;" id="bGuideDone">Done</button></div>`;
   window.scrollTo(0,0);
-  document.getElementById('bGuideBack').onclick = ()=>showCount();
-  document.getElementById('bGuideDone').onclick = ()=>showCount();
+  const leaveGuide = ()=>{ if(guideReturn==='home') showGuideVendorPicker(); else showCount(); };
+  document.getElementById('bGuideBack').onclick = leaveGuide;
+  document.getElementById('bGuideDone').onclick = leaveGuide;
   document.querySelectorAll('[data-gedit]').forEach(el=>{
     el.onclick = ()=>{ const k = el.dataset.gedit, p = k.lastIndexOf('|'); showGuideItemModal(vk, k.slice(0,p), +k.slice(p+1)); };
   });
