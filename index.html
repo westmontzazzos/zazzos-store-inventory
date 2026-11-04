@@ -809,7 +809,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '19.3';
+const APP_VERSION = '19.4';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -885,22 +885,6 @@ function initLocation(loc){
   applySavedItemEdits(loc);
 }
 
-async function applySavedItemEdits(loc){
-  try{
-    const res = await supa('item_edits?store=eq.'+encodeURIComponent(loc)+'&select=*&order=updated_at.asc');
-    if(!res.ok) return;
-    const edits = await res.json();
-    edits.forEach(e=>{
-      const vendorObj = DATA[loc][e.vendor];
-      if(!vendorObj) return;
-      const item = vendorObj.items.find(i=>i.loc===e.loc && i.item===e.original_item);
-      if(item){
-        item.item = e.new_item;
-        item.num = e.new_num || '—';
-      }
-    });
-  }catch(err){}
-}
 
 function ikey(item){ return item.loc+'|'+item.item; }
 function getC(vk,item,f){ return (counts[vk][ikey(item)]||{})[f]||''; }
@@ -3907,7 +3891,7 @@ function showCount(){
       }
       const meta = (item.num!=='—'?'#'+item.num+' · ':'')+'PAR: '+displayPar+wmCaseHint;
       const nameStyle = missingNum ? 'background:#FFF59D;border-radius:3px;padding:0 3px;display:inline-block;' : '';
-      const editAttr = vk==='greco' ? `data-editname="${loc}|${idx}"` : '';
+      const editAttr = '';
       return `<div class="ProdRow" data-name="${item.item.toLowerCase()}">
         <div class="ProdRow-info">
           <div class="ProdRow-name" style="${nameStyle}" ${editAttr}>${item.item}</div>
@@ -3985,7 +3969,8 @@ function showCount(){
       </div>
       <div style="padding:16px;">
         <button class="B B-red B-lg" style="width:100%;" id="bOrderComplete">✓ Complete Order</button>
-      </div>`}
+      </div>
+      ${vk.startsWith('bread') ? '' : `<div style="padding:0 16px 20px;"><button class="B B-outline" style="width:100%;" id="bGuideEdit">✎ Edit Guide — pars &amp; items</button></div>`}`}
     </div>
     <div class="Footer no-print">
       <button class="Fbtn" id="bHome2">← Home</button>
@@ -4015,19 +4000,9 @@ function showCount(){
   document.getElementById('bPrint').addEventListener('click',()=>showPrintChoice(vk));
 
   // Greco only: hold an item's name for 5 seconds to edit its name and item number
-  document.querySelectorAll('[data-editname]').forEach(nameEl=>{
-    let pressTimer = null;
-    const start = ()=>{ pressTimer = setTimeout(()=>showEditItemModal(vk, nameEl.dataset.editname), 5000); };
-    const cancel = ()=>{ if(pressTimer){ clearTimeout(pressTimer); pressTimer=null; } };
-    nameEl.addEventListener('touchstart', start);
-    nameEl.addEventListener('touchend', cancel);
-    nameEl.addEventListener('touchmove', cancel);
-    nameEl.addEventListener('mousedown', start);
-    nameEl.addEventListener('mouseup', cancel);
-    nameEl.addEventListener('mouseleave', cancel);
-  });
   document.getElementById('bBlank').addEventListener('click',()=>doPrint(vk,'blank'));
   document.getElementById('bWeeklyForm')?.addEventListener('click',()=>printWeeklyBlankSheet(vk));
+  document.getElementById('bGuideEdit')?.addEventListener('click',()=>requireGuideCode(()=>showGuideEditor(vk)));
   document.getElementById('bWeeklyCounts')?.addEventListener('click',()=>showWeeklyCountsScreen());
   document.getElementById('bClear').onclick=()=>{
     showModal('Clear All Counts','This will erase all entries for '+v.name+'. Are you sure?',[
@@ -4566,50 +4541,294 @@ function showModal(title, body, btns){
 }
 function closeModal(){ document.getElementById('modal')?.remove(); }
 
-function showEditItemModal(vk, editKey){
-  const [loc, idxStr] = editKey.split('|');
-  const idx = +idxStr;
-  const items = getLocItems(vk, loc);
-  const item = items[idx];
-  if(!item){ return; }
+// ─── EDIT GUIDE: change pars, item numbers, names; add / remove items ─────────
+// Saved in the shared item_edits table so every phone gets the same guide.
+//   edit row   : original_item = the item's built-in name, new_item = new name, new_num = JSON {num, par}
+//   new item   : original_item = "+id",                    new_num = JSON {add:true, num, par}
+//   removed    : original_item = the item's built-in name, new_num = JSON {removed:true, name, num, par}
+const GUIDE_CODE = '1234';
+let guideUnlocked = false;
+const GUIDE_REMOVED = {};   // "store|vendor" -> [{item}] items taken off the guide (can be restored)
 
+function guideEnsureOrig(it){ if(!it._o) it._o = {item:it.item, num:it.num, par:it.par}; }
+function guideIsModified(it){ guideEnsureOrig(it); return it.item!==it._o.item || it.num!==it._o.num || it.par!==it._o.par; }
+function escAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function guideInsertItem(vo, it){
+  const idxs = []; vo.items.forEach((x,i)=>{ if(x.loc===it.loc) idxs.push(i); });
+  if(!idxs.length){ vo.items.push(it); return; }
+  const names = idxs.map(i=>vo.items[i].item.toLowerCase());
+  const cmp = (a,b)=> a<b ? -1 : (a>b ? 1 : 0);   // plain character order, same as the lists are already sorted
+  const sorted = names.every((n,i)=> i===0 || cmp(names[i-1], n) <= 0);
+  let at = idxs[idxs.length-1] + 1;
+  if(sorted){
+    for(let k=0;k<idxs.length;k++){ if(cmp(it.item.toLowerCase(), names[k]) < 0){ at = idxs[k]; break; } }
+  }
+  vo.items.splice(at, 0, it);
+}
+
+async function applySavedItemEdits(loc){
+  // remember every item's built-in values first, so Reset can put them back
+  Object.keys(DATA[loc]).forEach(vk=>{
+    const vo = DATA[loc][vk];
+    if(vo && vo.items) vo.items.forEach(guideEnsureOrig);
+  });
+  try{
+    const res = await supa('item_edits?store=eq.'+encodeURIComponent(loc)+'&select=*&order=updated_at.asc');
+    if(!res.ok) return;
+    const edits = await res.json();
+    edits.forEach(e=>{
+      const vo = DATA[loc][e.vendor];
+      if(!vo || !vo.items) return;
+      let extra = null;
+      if(typeof e.new_num==='string' && e.new_num.trim().charAt(0)==='{'){ try{ extra = JSON.parse(e.new_num); }catch(_){ extra = null; } }
+
+      if(extra && extra.add){                       // brand-new item
+        if(vo.items.some(i=>i._id===e.original_item)) return;
+        const it = {loc:e.loc, item:e.new_item, num:extra.num||'—', par:extra.par||'—', _added:true, _id:e.original_item};
+        guideEnsureOrig(it);
+        guideInsertItem(vo, it);
+        return;
+      }
+
+      const item = vo.items.find(i=>i.loc===e.loc && (i.item===e.original_item || (i._o && i._o.item===e.original_item)));
+      if(!item) return;
+
+      if(extra && extra.removed){                   // taken off the guide
+        if(extra.name!==undefined) item.item = extra.name;
+        if(extra.num!==undefined) item.num = extra.num;
+        if(extra.par!==undefined) item.par = extra.par;
+        const k = loc+'|'+e.vendor;
+        const list = (GUIDE_REMOVED[k] = GUIDE_REMOVED[k] || []);
+        if(!list.some(r=>r.item===item)) list.push({item});
+        vo.items.splice(vo.items.indexOf(item), 1);
+        return;
+      }
+
+      item.item = e.new_item;                       // name / number / par change
+      if(extra){
+        if(extra.num!==undefined) item.num = extra.num;
+        if(extra.par!==undefined) item.par = extra.par;
+      } else {
+        item.num = e.new_num || '—';                // older rows: plain number
+      }
+    });
+  }catch(err){}
+}
+
+async function guideSaveRow(vk, loc, rowKey, newItem, newNumJson){
+  const q = 'item_edits?store=eq.'+encodeURIComponent(currentLoc)+'&vendor=eq.'+encodeURIComponent(vk)+'&loc=eq.'+encodeURIComponent(loc)+'&original_item=eq.'+encodeURIComponent(rowKey);
+  try{
+    const d = await supa(q, {method:'DELETE'});
+    if(newNumJson===null) return !!(d && d.ok);
+    const p = await supa('item_edits', {method:'POST', body: JSON.stringify({store:currentLoc, vendor:vk, loc:loc, original_item:rowKey, new_item:newItem, new_num:newNumJson})});
+    return !!(d && d.ok && p && p.ok);
+  }catch(err){ return false; }
+}
+function guideWarnIfFailed(ok){
+  if(ok) return;
+  showModal('Saved on this phone only', 'The change couldn’t be saved to the shared guide (check your connection). It will be lost if the app reloads. Open Edit Guide and try again.', [{l:'OK', c:'B-red', fn:closeModal}]);
+}
+function guideMigrateCounts(vk, oldKey, newKey){
+  if(oldKey!==newKey && counts[vk] && counts[vk][oldKey]){ counts[vk][newKey] = counts[vk][oldKey]; delete counts[vk][oldKey]; saveState(); }
+}
+
+async function guideApplyEdit(vk, it, name, num, par){
+  guideEnsureOrig(it);
+  const oldKey = ikey(it);
+  it.item = name; it.num = num || '—'; it.par = par || '—';
+  guideMigrateCounts(vk, oldKey, ikey(it));
+  if(it._added) return guideSaveRow(vk, it.loc, it._id, it.item, JSON.stringify({add:true, num:it.num, par:it.par}));
+  if(!guideIsModified(it)) return guideSaveRow(vk, it.loc, it._o.item, it.item, null);   // back to original: clear the saved edit
+  return guideSaveRow(vk, it.loc, it._o.item, it.item, JSON.stringify({num:it.num, par:it.par}));
+}
+async function guideResetItem(vk, it){
+  const oldKey = ikey(it);
+  it.item = it._o.item; it.num = it._o.num; it.par = it._o.par;
+  guideMigrateCounts(vk, oldKey, ikey(it));
+  return guideSaveRow(vk, it.loc, it._o.item, it.item, null);
+}
+async function guideRemoveItem(vk, it){
+  const vo = vdef(vk);
+  const i = vo.items.indexOf(it); if(i>=0) vo.items.splice(i,1);
+  if(it._added) return guideSaveRow(vk, it.loc, it._id, it.item, null);
+  const k = currentLoc+'|'+vk;
+  const list = (GUIDE_REMOVED[k] = GUIDE_REMOVED[k] || []);
+  if(!list.some(r=>r.item===it)) list.push({item:it});
+  return guideSaveRow(vk, it.loc, it._o.item, it.item, JSON.stringify({removed:true, name:it.item, num:it.num, par:it.par}));
+}
+async function guideRestoreItem(vk, i){
+  const k = currentLoc+'|'+vk;
+  const list = GUIDE_REMOVED[k] || [];
+  const entry = list[i]; if(!entry) return;
+  const it = entry.item; list.splice(i,1);
+  guideInsertItem(vdef(vk), it);
+  const ok = await guideSaveRow(vk, it.loc, it._o.item, it.item, guideIsModified(it) ? JSON.stringify({num:it.num, par:it.par}) : null);
+  guideWarnIfFailed(ok);
+  showGuideEditor(vk);
+}
+
+function requireGuideCode(onOk){
+  if(guideUnlocked){ onOk(); return; }
+  showModal('Edit Guide',
+    `<div style="text-align:left;">
+       <div style="font-size:13px;color:#777;margin-bottom:10px;">Enter the code to edit pars and items.</div>
+       <input id="guideCode" type="password" inputmode="numeric" maxlength="10" placeholder="Code"
+         style="width:100%;border:2px solid #E2E2E2;border-radius:8px;padding:12px;font-size:20px;text-align:center;letter-spacing:.3em;font-family:'Inter',sans-serif;">
+     </div>`,
+    [
+      {l:'Cancel', c:'B-outline', fn:closeModal},
+      {l:'Unlock', c:'B-red', fn:()=>{
+        const inp = document.getElementById('guideCode');
+        if(inp.value===GUIDE_CODE){ guideUnlocked = true; closeModal(); onOk(); }
+        else { inp.value=''; inp.style.borderColor='#C8102E'; inp.placeholder='Wrong code'; }
+      }}
+    ]);
+  setTimeout(()=>{ document.getElementById('guideCode')?.focus(); }, 50);
+}
+
+function guideChip(it){
+  const st = 'font-size:9px;font-weight:700;border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle;color:#fff;';
+  if(it._added) return `<span style="${st}background:#1B6B3A;">NEW</span>`;
+  if(guideIsModified(it)) return `<span style="${st}background:#C8102E;">EDITED</span>`;
+  return '';
+}
+
+function showGuideEditor(vk){
+  const v = vdef(vk);
+  const locs = [...new Set(v.items.map(i=>i.loc))];
+  const removed = GUIDE_REMOVED[currentLoc+'|'+vk] || [];
+  const secs = locs.map(loc=>{
+    const items = getLocItems(vk, loc);
+    return `<div class="LocBlock" style="margin-bottom:14px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px 6px;">
+        <div style="font-size:11px;font-weight:700;color:#1B6B3A;text-transform:uppercase;letter-spacing:.05em;">${loc}</div>
+        <button class="B B-outline" style="padding:6px 10px;font-size:12px;" data-gadd="${escAttr(loc)}">+ Add item</button>
+      </div>
+      ${items.map((it,i)=>`
+        <div class="ProdRow" style="cursor:pointer;" data-gedit="${escAttr(loc)}|${i}">
+          <div class="ProdRow-info">
+            <div class="ProdRow-name">${it.item}${guideChip(it)}</div>
+            <div class="ProdRow-meta">#${it.num} · Par: ${it.par}</div>
+          </div>
+          <div style="color:#999;font-size:18px;">✎</div>
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+  const removedHtml = removed.length ? `
+    <div class="LocBlock" style="margin-bottom:14px;border:2px dashed #C8102E;">
+      <div style="padding:12px 16px 6px;font-size:11px;font-weight:700;color:#C8102E;text-transform:uppercase;letter-spacing:.05em;">Removed items — tap Restore to bring one back</div>
+      ${removed.map((r,i)=>`
+        <div class="ProdRow">
+          <div class="ProdRow-info">
+            <div class="ProdRow-name">${r.item.item}</div>
+            <div class="ProdRow-meta">${r.item.loc} · #${r.item.num} · Par: ${r.item.par}</div>
+          </div>
+          <button class="B B-outline" style="padding:6px 10px;font-size:12px;" data-grestore="${i}">Restore</button>
+        </div>`).join('')}
+    </div>` : '';
+  app.innerHTML = `
+    <header class="H no-print">
+      <div class="H-logo">Edit Guide</div>
+      <div class="H-right"><button class="B B-ghost" id="bGuideBack">← Back</button></div>
+    </header>
+    <div class="Page" style="margin-top:76px;">
+      <div style="font-family:'Libre Baskerville',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;">${v.name}</div>
+      <div style="font-size:13px;color:#777;margin-bottom:16px;">Tap an item to change its name, number, or par. Changes save for every phone — other phones pick them up the next time the app is opened.</div>
+      ${secs}${removedHtml}
+    </div>
+    <div class="Footer no-print"><button class="B B-red B-lg" style="width:100%;" id="bGuideDone">Done</button></div>`;
+  window.scrollTo(0,0);
+  document.getElementById('bGuideBack').onclick = ()=>showCount();
+  document.getElementById('bGuideDone').onclick = ()=>showCount();
+  document.querySelectorAll('[data-gedit]').forEach(el=>{
+    el.onclick = ()=>{ const k = el.dataset.gedit, p = k.lastIndexOf('|'); showGuideItemModal(vk, k.slice(0,p), +k.slice(p+1)); };
+  });
+  document.querySelectorAll('[data-gadd]').forEach(el=>{ el.onclick = ()=>showGuideAddModal(vk, el.dataset.gadd); });
+  document.querySelectorAll('[data-grestore]').forEach(el=>{ el.onclick = ()=>guideRestoreItem(vk, +el.dataset.grestore); });
+}
+
+function guideFields(it){
+  const lbl = 'font-size:12px;font-weight:700;color:#777;text-transform:uppercase;';
+  const inp = "width:100%;border:2px solid #E2E2E2;border-radius:8px;padding:10px;font-size:15px;margin:6px 0 12px;font-family:'Inter',sans-serif;";
+  return `
+    <label style="${lbl}">Item Name</label>
+    <input id="gName" type="text" value="${escAttr(it.item)}" style="${inp}">
+    <label style="${lbl}">Item Number</label>
+    <input id="gNum" type="text" value="${escAttr(it.num==='—'?'':it.num)}" style="${inp}">
+    <label style="${lbl}">Par</label>
+    <input id="gPar" type="text" value="${escAttr(it.par==='—'?'':it.par)}" placeholder="e.g. 2 cases" style="${inp}">
+    <div id="gErr" style="color:#C8102E;font-size:12px;font-weight:700;min-height:16px;"></div>`;
+}
+function guideRead(){
+  return {name:document.getElementById('gName').value.trim(), num:document.getElementById('gNum').value.trim(), par:document.getElementById('gPar').value.trim()};
+}
+
+function showGuideItemModal(vk, loc, idx){
+  const it = getLocItems(vk, loc)[idx];
+  if(!it) return;
+  guideEnsureOrig(it);
+  const canReset = !it._added && guideIsModified(it);
   showModal('Edit Item',
     `<div style="text-align:left;">
-      <label style="font-size:12px;font-weight:700;color:#777;text-transform:uppercase;">Item Name</label>
-      <input id="editItemName" type="text" value="${item.item.replace(/"/g,'&quot;')}"
-        style="width:100%;border:2px solid #E2E2E2;border-radius:8px;padding:10px;font-size:15px;margin:6px 0 14px;font-family:'Inter',sans-serif;">
-      <label style="font-size:12px;font-weight:700;color:#777;text-transform:uppercase;">Item Number</label>
-      <input id="editItemNum" type="text" value="${item.num==='—'?'':item.num}"
-        style="width:100%;border:2px solid #E2E2E2;border-radius:8px;padding:10px;font-size:15px;margin:6px 0;font-family:'Inter',sans-serif;">
-    </div>`,
+       ${guideFields(it)}
+       <div style="display:flex;gap:8px;">
+         ${canReset ? `<button class="B B-outline" id="gReset" style="flex:1;">↺ Reset to original</button>` : ''}
+         <button class="B B-outline" id="gRemove" style="flex:1;color:#C8102E;border-color:#C8102E;">🗑 Remove</button>
+       </div>
+     </div>`,
     [
       {l:'Cancel', c:'B-outline', fn:closeModal},
       {l:'Save', c:'B-red', fn: async ()=>{
-        const newName = document.getElementById('editItemName').value.trim();
-        const newNum = document.getElementById('editItemNum').value.trim();
-        if(!newName){ return; }
-        const oldKey = ikey(item);
-        const originalName = item.item;
-        item.item = newName;
-        item.num = newNum || '—';
-        const newKey = ikey(item);
-        if(oldKey!==newKey && counts[vk] && counts[vk][oldKey]){
-          counts[vk][newKey] = counts[vk][oldKey];
-          delete counts[vk][oldKey];
-          saveState();
-        }
-        try{
-          await supa('item_edits?store=eq.'+encodeURIComponent(currentLoc)+'&vendor=eq.'+encodeURIComponent(vk)+'&loc=eq.'+encodeURIComponent(loc)+'&original_item=eq.'+encodeURIComponent(originalName), {method:'DELETE'});
-          await supa('item_edits', {method:'POST', body: JSON.stringify({
-            store: currentLoc, vendor: vk, loc: loc,
-            original_item: originalName, new_item: newName, new_num: newNum || '—'
-          })});
-        }catch(err){}
+        const f = guideRead();
+        if(!f.name){ document.getElementById('gErr').textContent = 'Name can’t be empty.'; return; }
+        if(getLocItems(vk, loc).some(x=>x!==it && x.item===f.name)){ document.getElementById('gErr').textContent = 'Another item in this section already has that name.'; return; }
         closeModal();
-        showCount();
+        const ok = await guideApplyEdit(vk, it, f.name, f.num, f.par);
+        guideWarnIfFailed(ok);
+        showGuideEditor(vk);
       }}
-    ]
-  );
+    ]);
+  document.getElementById('gReset')?.addEventListener('click', async ()=>{
+    closeModal();
+    const ok = await guideResetItem(vk, it);
+    guideWarnIfFailed(ok);
+    showGuideEditor(vk);
+  });
+  document.getElementById('gRemove').addEventListener('click', ()=>{
+    closeModal();
+    showModal('Remove item?',
+      `<div style="text-align:left;font-size:14px;line-height:1.5;">Take <b>${it.item}</b> off the ${vdef(vk).name} guide?${it._added ? '' : ' You can bring it back from “Removed items” on the Edit Guide screen.'}</div>`,
+      [
+        {l:'Cancel', c:'B-outline', fn:closeModal},
+        {l:'Remove', c:'B-red', fn: async ()=>{
+          closeModal();
+          const ok = await guideRemoveItem(vk, it);
+          guideWarnIfFailed(ok);
+          showGuideEditor(vk);
+        }}
+      ]);
+  });
+}
+
+function showGuideAddModal(vk, loc){
+  showModal('Add Item — '+loc,
+    `<div style="text-align:left;">${guideFields({item:'', num:'—', par:'—'})}</div>`,
+    [
+      {l:'Cancel', c:'B-outline', fn:closeModal},
+      {l:'Add', c:'B-red', fn: async ()=>{
+        const f = guideRead();
+        if(!f.name){ document.getElementById('gErr').textContent = 'Enter a name.'; return; }
+        if(getLocItems(vk, loc).some(x=>x.item===f.name)){ document.getElementById('gErr').textContent = 'That name is already in this section.'; return; }
+        closeModal();
+        const it = {loc:loc, item:f.name, num:f.num||'—', par:f.par||'—', _added:true, _id:'+'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)};
+        guideEnsureOrig(it);
+        guideInsertItem(vdef(vk), it);
+        const ok = await guideSaveRow(vk, loc, it._id, it.item, JSON.stringify({add:true, num:it.num, par:it.par}));
+        guideWarnIfFailed(ok);
+        showGuideEditor(vk);
+      }}
+    ]);
 }
 
 // ─── PRINT ───────────────────────────────────────────────────────────────────
