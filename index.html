@@ -811,7 +811,7 @@ const DATA = {
 }
 };
 let VENDORS = null;
-const APP_VERSION = '19.6';
+const APP_VERSION = '19.7';
 let currentLoc = null;
 
 const SEQ = () => false;
@@ -2696,6 +2696,7 @@ function usToISO(us){
 
 async function finishOrderComplete(vk, onDone){
   const goNext = onDone || showLogin;
+  if(vk==='coke') cokeAvgFetchedAt = 0;
   completed[vk] = new Date().toISOString();
   saveState();
   const todayISO = localISO(new Date()); // dashboard always checks against real completion date, local time
@@ -3910,7 +3911,8 @@ function showCount(){
       } else if(currentLoc==='westmont' && ['greco','gfs'].includes(vk) && WM_MANUAL_CASE_SIZES[item.item]!==undefined){
         wmCaseHint = ` · 1 case = ${WM_MANUAL_CASE_SIZES[item.item]}`;
       }
-      const meta = (item.num!=='—'?'#'+item.num+' · ':'')+'PAR: '+displayPar+wmCaseHint;
+      const cokeAvg = (currentLoc==='darien' && vk==='coke') ? `<span data-cokeavg="${escAttr(loc+'|'+item.item)}">${cokeAvgText(loc,item.item)}</span>` : '';
+      const meta = (item.num!=='—'?'#'+item.num+' · ':'')+'PAR: '+displayPar+cokeAvg+wmCaseHint;
       const nameStyle = missingNum ? 'background:#FFF59D;border-radius:3px;padding:0 3px;display:inline-block;' : '';
       const editAttr = '';
       return `<div class="ProdRow" data-name="${item.item.toLowerCase()}">
@@ -4024,6 +4026,7 @@ function showCount(){
   document.getElementById('bBlank').addEventListener('click',()=>doPrint(vk,'blank'));
   document.getElementById('bWeeklyForm')?.addEventListener('click',()=>printWeeklyBlankSheet(vk));
   document.getElementById('bGuideEdit')?.addEventListener('click',()=>requireGuideCode(()=>{ guideReturn = 'count'; showGuideEditor(vk); }));
+  if(currentLoc==='darien' && vk==='coke') loadCokeAverages();
   document.getElementById('bWeeklyCounts')?.addEventListener('click',()=>showWeeklyCountsScreen());
   document.getElementById('bClear').onclick=()=>{
     showModal('Clear All Counts','This will erase all entries for '+v.name+'. Are you sure?',[
@@ -4561,6 +4564,77 @@ function showModal(title, body, btns){
   el.querySelectorAll('[data-i]').forEach(b=>b.onclick=()=>btns[+b.dataset.i].fn());
 }
 function closeModal(){ document.getElementById('modal')?.remove(); }
+
+// ─── DARIEN COKE: running average of what we order, per section + item ───────
+// Re-read from EVERY saved Coke order each time the count screen opens, so it keeps
+// updating by itself with each new order — from the first order to whenever.
+let COKE_AVG = {};          // "Section|Item" -> {avg, n}
+let cokeAvgFetchedAt = 0;
+
+// The Coke list exactly as it was when the older orders were saved (they didn't record the section)
+const COKE_LEGACY_ORDER = [['Can','Coke'],['Can','Diet Coke'],['Can','Coke Zero'],['Can','Cherry Coke'],['Can','Sprite'],
+  ['Bottle','Coke'],['Bottle','Diet Coke'],['Bottle','Coke Zero'],['Bottle','Sprite'],
+  ['B.I.B','Coke'],['B.I.B','Diet Coke'],['B.I.B','Coke Zero'],['B.I.B','Cherry Coke'],['B.I.B','Sprite'],['B.I.B','Pibb'],['B.I.B','Tonic'],['B.I.B','Ginger Ale'],['B.I.B','Lemonade'],['B.I.B','Tea'],['B.I.B','Cranberry'],
+  ['Extra','Orange Juice']];
+
+function cokeAvgText(loc, name){
+  let a = COKE_AVG[loc+'|'+name];
+  if(!a && DATA && DATA.darien){                       // item was renamed in Edit Guide: use its history under the original name
+    const it = DATA.darien.coke.items.find(i=>i.loc===loc && i.item===name);
+    if(it && it._o) a = COKE_AVG[loc+'|'+it._o.item];
+  }
+  return a ? ' / '+a.avg.toFixed(1) : '';
+}
+
+function cokeComputeAverages(rows, items){
+  const batches = {};
+  rows.forEach(r=>{ (batches[r.batch_id] = batches[r.batch_id] || []).push(r); });
+  const sums = {}, cnts = {};
+  const add = (loc, name, qty)=>{ const k = loc+'|'+name; sums[k] = (sums[k]||0) + qty; cnts[k] = (cnts[k]||0) + 1; };
+  Object.keys(batches).forEach(b=>{
+    const rs = batches[b].filter(r=>!(r.item||'').startsWith('[ADD-ON]'));
+    const hasLoc = rs.length>0 && rs.every(r=>/\|loc:/.test(r.item_num||''));
+    if(hasLoc){
+      rs.forEach(r=>{ const m = r.item_num.match(/\|loc:(.+)$/); add(m[1], r.item, Number(r.qty)||0); });
+    } else {
+      // Older orders didn't record the section. Their rows were saved in the same order as the list
+      // (Can, Bottle, B.I.B, Extra), so place each row by walking the list in order.
+      let pos = 0;
+      rs.forEach(r=>{
+        let j = pos;
+        while(j<COKE_LEGACY_ORDER.length && COKE_LEGACY_ORDER[j][1]!==r.item) j++;
+        if(j===COKE_LEGACY_ORDER.length) return;   // can't place it — leave it out
+        add(COKE_LEGACY_ORDER[j][0], r.item, Number(r.qty)||0);
+        pos = j + 1;
+      });
+    }
+  });
+  const out = {};
+  Object.keys(sums).forEach(k=>{ out[k] = {avg: sums[k]/cnts[k], n: cnts[k]}; });
+  return out;
+}
+
+async function loadCokeAverages(force){
+  if(currentLoc!=='darien') return;
+  if(!force && Date.now()-cokeAvgFetchedAt < 5*60*1000 && Object.keys(COKE_AVG).length) return;
+  try{
+    const rows = []; let off = 0;
+    while(true){
+      const res = await supa('inventory_orders?store=eq.darien&vendor=eq.Coke&select=batch_id,item,item_num,qty&order=id.asc&limit=1000&offset='+off);
+      if(!res.ok) return;
+      const page = await res.json();
+      rows.push(...page);
+      if(page.length<1000) break;
+      off += 1000;
+    }
+    COKE_AVG = cokeComputeAverages(rows, DATA.darien.coke.items);
+    cokeAvgFetchedAt = Date.now();
+    document.querySelectorAll('[data-cokeavg]').forEach(el=>{
+      const k = el.dataset.cokeavg, p = k.indexOf('|');
+      el.textContent = cokeAvgText(k.slice(0,p), k.slice(p+1));
+    });
+  }catch(e){}
+}
 
 // ─── EDIT GUIDE: change pars, item numbers, names; add / remove items ─────────
 // Saved in the shared item_edits table so every phone gets the same guide.
